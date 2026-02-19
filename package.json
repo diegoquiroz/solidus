@@ -2,6 +2,13 @@
   "name": "@diegoquiroz/solidus",
   "module": "index.ts",
   "type": "module",
+  "scripts": {
+    "test": "bun test",
+    "test:integration": "bun test",
+    "typecheck": "bunx tsc --noEmit",
+    "lint": "bunx tsc --noEmit",
+    "docs:core": "bun run scripts/generate-core-api-docs.ts"
+  },
   "devDependencies": {
     "@types/bun": "latest"
   },

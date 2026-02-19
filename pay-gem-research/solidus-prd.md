@@ -129,27 +129,27 @@ Security/reliability gates:
 
 ## 10. Milestones, Tasks, and Subtasks
 
-- [ ] **Milestone M1: Foundation and Data Model**
-  - [ ] **Task M1-T1: Package skeleton and core contracts**
-    - [ ] Create package structure: `core`, `stripe`, `express`, `sequelize`, facade.
-    - [ ] Define core interfaces (customer registry, repositories, queue adapter, event bus).
-    - [ ] Define error taxonomy (`ActionRequiredError`, `ProviderError`, etc).
-    - [ ] Verification: Compile and typecheck all packages.
-    - [ ] Verification: Contract tests for interface behavior with fake adapters.
-    - [ ] Definition of Done: Public API docs generated for core contracts.
-  - [ ] **Task M1-T2: Sequelize schema and migrations**
-    - [ ] Implement models for customers, subscriptions, charges, payment methods, webhooks, merchants.
-    - [ ] Add unique constraints and indexes for idempotency and default semantics.
-    - [ ] Ship migration templates and integration instructions.
-    - [ ] Verification: Migration up/down tests on PostgreSQL.
-    - [ ] Verification: Constraint tests (duplicate processor_id/event_id prevention).
-    - [ ] Definition of Done: ERD and schema docs published.
-  - [ ] **Task M1-T3: Registration API (`pay_customer` equivalent)**
-    - [ ] Implement `registerCustomerModel` API.
-    - [ ] Implement owner resolution and client-reference safety helpers.
-    - [ ] Add examples for User model integration.
-    - [ ] Verification: Unit tests for registration, default selection, owner resolution failures.
-    - [ ] Definition of Done: API docs include migration guidance from Pay semantics.
+- [x] **Milestone M1: Foundation and Data Model**
+  - [x] **Task M1-T1: Package skeleton and core contracts**
+    - [x] Create package structure: `core`, `stripe`, `express`, `sequelize`, facade.
+    - [x] Define core interfaces (customer registry, repositories, queue adapter, event bus).
+    - [x] Define error taxonomy (`ActionRequiredError`, `ProviderError`, etc).
+    - [x] Verification: Compile and typecheck all packages.
+    - [x] Verification: Contract tests for interface behavior with fake adapters.
+    - [x] Definition of Done: Public API docs generated for core contracts.
+  - [x] **Task M1-T2: Sequelize schema and migrations**
+    - [x] Implement models for customers, subscriptions, charges, payment methods, webhooks, merchants.
+    - [x] Add unique constraints and indexes for idempotency and default semantics.
+    - [x] Ship migration templates and integration instructions.
+    - [x] Verification: Migration up/down tests on PostgreSQL.
+    - [x] Verification: Constraint tests (duplicate processor_id/event_id prevention).
+    - [x] Definition of Done: ERD and schema docs published.
+  - [x] **Task M1-T3: Registration API (`pay_customer` equivalent)**
+    - [x] Implement `registerCustomerModel` API.
+    - [x] Implement owner resolution and client-reference safety helpers.
+    - [x] Add examples for User model integration.
+    - [x] Verification: Unit tests for registration, default selection, owner resolution failures.
+    - [x] Definition of Done: API docs include migration guidance from Pay semantics.
 
 - [ ] **Milestone M2: Stripe Customer, Payment Method, Charge, Subscription APIs**
   - [ ] **Task M2-T1: Stripe customer service**

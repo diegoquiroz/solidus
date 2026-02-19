@@ -20,8 +20,8 @@
         "pnpm test:integration passes"
       ],
       "priority": 1,
-      "passes": false,
-      "notes": "",
+      "passes": true,
+      "notes": "Completed package skeleton, core contracts, error taxonomy, contract tests, and generated core API docs (docs/core-contracts.api.md). Verified with bun test and bunx tsc --noEmit.",
       "dependsOn": []
     },
     {
@@ -41,8 +41,8 @@
         "pnpm test:integration passes"
       ],
       "priority": 2,
-      "passes": false,
-      "notes": "",
+      "passes": true,
+      "notes": "Completed SQL-first schema artifacts for merchants, customers, subscriptions, charges, payment_methods, and webhooks with required unique and partial indexes. Added migration templates, ERD/schema docs, and migration artifact tests.",
       "dependsOn": [
         "US-001"
       ]
@@ -63,8 +63,8 @@
         "pnpm test:integration passes"
       ],
       "priority": 3,
-      "passes": false,
-      "notes": "",
+      "passes": true,
+      "notes": "Completed registerCustomerModel API, in-memory registry, owner resolution guardrails, and client reference safety helpers. Added unit tests and Pay migration guidance in generated docs.",
       "dependsOn": [
         "US-001",
         "US-002"
