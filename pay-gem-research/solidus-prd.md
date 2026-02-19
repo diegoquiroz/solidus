@@ -151,31 +151,31 @@ Security/reliability gates:
     - [x] Verification: Unit tests for registration, default selection, owner resolution failures.
     - [x] Definition of Done: API docs include migration guidance from Pay semantics.
 
-- [ ] **Milestone M2: Stripe Customer, Payment Method, Charge, Subscription APIs**
-  - [ ] **Task M2-T1: Stripe customer service**
-    - [ ] Implement create/retrieve/update customer API logic.
-    - [ ] Support configurable customer attributes mapping.
-    - [ ] Add reconciliation helper entry points.
-    - [ ] Verification: Integration tests with Stripe test mode for create/update flows.
-    - [ ] Definition of Done: Reconciliation caveats documented.
-  - [ ] **Task M2-T2: Payment method management**
-    - [ ] Implement add/update/default logic.
-    - [ ] Persist normalized payment method summary + raw payload.
-    - [ ] Implement detach cleanup.
-    - [ ] Verification: Integration tests for default method switching and detached method cleanup.
-    - [ ] Definition of Done: Cookbook example for SetupIntent + attach flow published.
-  - [ ] **Task M2-T3: Charges and refunds**
-    - [ ] Implement `charge`, `authorize`, `capture`, `refund` APIs.
-    - [ ] Persist receipt URL, tax fields, refund totals, payment method snapshots.
-    - [ ] Wrap Stripe exceptions into Solidus errors.
-    - [ ] Verification: Integration tests: successful charge, failed charge, partial refund, multiple refunds.
-    - [ ] Definition of Done: Error handling guide and retry guidance published.
-  - [ ] **Task M2-T4: Subscription lifecycle**
-    - [ ] Implement create/cancel/cancelNow/resume/swap/changeQuantity/pause/unpause.
-    - [ ] Implement state helpers and period calculations.
-    - [ ] Implement retry failed payment and open invoice payment helpers.
-    - [ ] Verification: Integration tests for lifecycle transitions and SCA-required transitions.
-    - [ ] Definition of Done: State machine table documented.
+- [x] **Milestone M2: Stripe Customer, Payment Method, Charge, Subscription APIs**
+  - [x] **Task M2-T1: Stripe customer service**
+    - [x] Implement create/retrieve/update customer API logic.
+    - [x] Support configurable customer attributes mapping.
+    - [x] Add reconciliation helper entry points.
+    - [x] Verification: Integration tests with Stripe test mode for create/update flows.
+    - [x] Definition of Done: Reconciliation caveats documented.
+  - [x] **Task M2-T2: Payment method management**
+    - [x] Implement add/update/default logic.
+    - [x] Persist normalized payment method summary + raw payload.
+    - [x] Implement detach cleanup.
+    - [x] Verification: Integration tests for default method switching and detached method cleanup.
+    - [x] Definition of Done: Cookbook example for SetupIntent + attach flow published.
+  - [x] **Task M2-T3: Charges and refunds**
+    - [x] Implement `charge`, `authorize`, `capture`, `refund` APIs.
+    - [x] Persist receipt URL, tax fields, refund totals, payment method snapshots.
+    - [x] Wrap Stripe exceptions into Solidus errors.
+    - [x] Verification: Integration tests: successful charge, failed charge, partial refund, multiple refunds.
+    - [x] Definition of Done: Error handling guide and retry guidance published.
+  - [x] **Task M2-T4: Subscription lifecycle**
+    - [x] Implement create/cancel/cancelNow/resume/swap/changeQuantity/pause/unpause.
+    - [x] Implement state helpers and period calculations.
+    - [x] Implement retry failed payment and open invoice payment helpers.
+    - [x] Verification: Integration tests for lifecycle transitions and SCA-required transitions.
+    - [x] Definition of Done: State machine table documented.
 
 - [ ] **Milestone M3: Webhooks and Async Processing**
   - [ ] **Task M3-T1: Express webhook adapter**

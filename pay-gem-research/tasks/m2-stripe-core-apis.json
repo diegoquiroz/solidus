@@ -19,8 +19,8 @@
         "pnpm test:integration passes"
       ],
       "priority": 1,
-      "passes": false,
-      "notes": "",
+      "passes": true,
+      "notes": "Implemented Stripe customer create/retrieve/update APIs, configurable customer attribute mapping hook, and reconciliation entry points (reconcileByEmail/reconcileByProcessorId). Added unit and env-gated Stripe test-mode integration coverage plus documentation of reconciliation caveats.",
       "dependsOn": []
     },
     {
@@ -39,8 +39,8 @@
         "pnpm test:integration passes"
       ],
       "priority": 2,
-      "passes": false,
-      "notes": "",
+      "passes": true,
+      "notes": "Implemented payment method add/update/default/detach flows, persisted normalized summary and raw payload through repository contracts, and covered default switching plus detach cleanup in unit tests. Added SetupIntent + attach cookbook guidance in docs/stripe-core-apis.md.",
       "dependsOn": [
         "US-001"
       ]
@@ -61,8 +61,8 @@
         "pnpm test:integration passes"
       ],
       "priority": 3,
-      "passes": false,
-      "notes": "",
+      "passes": true,
+      "notes": "Implemented charge/authorize/capture/refund APIs via PaymentIntents and Refunds, persisted receipt/snapshot/refund projection fields, and wrapped Stripe exceptions into Solidus error taxonomy. Added charge/refund failure and retry guidance in docs.",
       "dependsOn": [
         "US-001",
         "US-002"
@@ -84,8 +84,8 @@
         "pnpm test:integration passes"
       ],
       "priority": 4,
-      "passes": false,
-      "notes": "",
+      "passes": true,
+      "notes": "Implemented subscription lifecycle operations (create/cancel/cancelNow/resume/swap/changeQuantity/pause/unpause), state helpers, billing period helpers, and invoice payment retry helpers. Added lifecycle and state helper tests plus state machine documentation.",
       "dependsOn": [
         "US-001",
         "US-002",
