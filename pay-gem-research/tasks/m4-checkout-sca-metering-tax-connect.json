@@ -1,0 +1,96 @@
+{
+  "name": "Solidus Milestone M4 - Checkout, SCA, Metering, Tax, Connect",
+  "branchName": "ralph/solidus-m4-checkout-sca-metering-tax-connect",
+  "description": "Complete checkout, SCA continuation, metered billing, tax persistence, and Stripe Connect parity features.",
+  "userStories": [
+    {
+      "id": "US-001",
+      "title": "Implement Checkout and Billing Portal APIs",
+      "description": "As a product engineer, I want checkout and portal helpers so apps can launch customer billing flows quickly.",
+      "acceptanceCriteria": [
+        "Implement checkout helper for payment, setup, and subscription modes",
+        "Support success and cancel URL helpers and session id propagation helper",
+        "Implement billing portal session helper",
+        "Pass integration tests for each checkout mode",
+        "Publish example app walkthrough for checkout completion and webhook sync",
+        "pnpm lint passes",
+        "pnpm typecheck passes",
+        "pnpm test passes",
+        "pnpm test:integration passes"
+      ],
+      "priority": 1,
+      "passes": false,
+      "notes": "",
+      "dependsOn": []
+    },
+    {
+      "id": "US-002",
+      "title": "Implement SCA action-required workflow",
+      "description": "As an app developer, I want consistent action-required errors so I can guide users through Stripe confirmation steps.",
+      "acceptanceCriteria": [
+        "Implement ActionRequiredError mapping",
+        "Provide continuation contract including paymentIntentId, clientSecret, and recommended next action",
+        "Publish Express-oriented confirmation flow recipes",
+        "Pass integration tests with SCA-required test cards",
+        "Publish troubleshooting guidance for common SCA failures",
+        "pnpm lint passes",
+        "pnpm typecheck passes",
+        "pnpm test passes",
+        "pnpm test:integration passes"
+      ],
+      "priority": 2,
+      "passes": false,
+      "notes": "",
+      "dependsOn": [
+        "US-001"
+      ]
+    },
+    {
+      "id": "US-003",
+      "title": "Implement metered billing and tax support",
+      "description": "As a SaaS team, I want usage and tax support so invoices correctly reflect metered events and tax requirements.",
+      "acceptanceCriteria": [
+        "Implement meter event APIs",
+        "Support automatic tax options and tax field persistence",
+        "Add migration guidance for usage-records-to-meters path",
+        "Pass integration tests for meter event creation and taxed invoice projections",
+        "Publish tax and metering cookbook documentation",
+        "pnpm lint passes",
+        "pnpm typecheck passes",
+        "pnpm test passes",
+        "pnpm test:integration passes"
+      ],
+      "priority": 3,
+      "passes": false,
+      "notes": "",
+      "dependsOn": [
+        "US-001",
+        "US-002"
+      ]
+    },
+    {
+      "id": "US-004",
+      "title": "Implement Stripe Connect parity",
+      "description": "As a platform product team, I want Connect account flows and status sync so merchant onboarding and payouts are production-ready.",
+      "acceptanceCriteria": [
+        "Implement merchant model and account workflows",
+        "Implement account onboarding and status update handling",
+        "Implement transfer helpers where applicable",
+        "Pass integration tests for account creation and onboarding status synchronization",
+        "Complete and sign off Connect feature parity checklist",
+        "pnpm lint passes",
+        "pnpm typecheck passes",
+        "pnpm test passes",
+        "pnpm test:integration passes"
+      ],
+      "priority": 4,
+      "passes": false,
+      "notes": "",
+      "dependsOn": [
+        "US-001",
+        "US-002",
+        "US-003"
+      ]
+    }
+  ]
+}

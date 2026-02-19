@@ -129,187 +129,119 @@ Security/reliability gates:
 
 ## 10. Milestones, Tasks, and Subtasks
 
-### Milestone M1: Foundation and Data Model
+- [ ] **Milestone M1: Foundation and Data Model**
+  - [ ] **Task M1-T1: Package skeleton and core contracts**
+    - [ ] Create package structure: `core`, `stripe`, `express`, `sequelize`, facade.
+    - [ ] Define core interfaces (customer registry, repositories, queue adapter, event bus).
+    - [ ] Define error taxonomy (`ActionRequiredError`, `ProviderError`, etc).
+    - [ ] Verification: Compile and typecheck all packages.
+    - [ ] Verification: Contract tests for interface behavior with fake adapters.
+    - [ ] Definition of Done: Public API docs generated for core contracts.
+  - [ ] **Task M1-T2: Sequelize schema and migrations**
+    - [ ] Implement models for customers, subscriptions, charges, payment methods, webhooks, merchants.
+    - [ ] Add unique constraints and indexes for idempotency and default semantics.
+    - [ ] Ship migration templates and integration instructions.
+    - [ ] Verification: Migration up/down tests on PostgreSQL.
+    - [ ] Verification: Constraint tests (duplicate processor_id/event_id prevention).
+    - [ ] Definition of Done: ERD and schema docs published.
+  - [ ] **Task M1-T3: Registration API (`pay_customer` equivalent)**
+    - [ ] Implement `registerCustomerModel` API.
+    - [ ] Implement owner resolution and client-reference safety helpers.
+    - [ ] Add examples for User model integration.
+    - [ ] Verification: Unit tests for registration, default selection, owner resolution failures.
+    - [ ] Definition of Done: API docs include migration guidance from Pay semantics.
 
-#### Task M1-T1: Package skeleton and core contracts
-- Subtasks:
-  - Create package structure: `core`, `stripe`, `express`, `sequelize`, facade.
-  - Define core interfaces (customer registry, repositories, queue adapter, event bus).
-  - Define error taxonomy (`ActionRequiredError`, `ProviderError`, etc).
-- Verification:
-  - Compile and typecheck all packages.
-  - Contract tests for interface behavior with fake adapters.
-- Definition of Done:
-  - Public API docs generated for core contracts.
+- [ ] **Milestone M2: Stripe Customer, Payment Method, Charge, Subscription APIs**
+  - [ ] **Task M2-T1: Stripe customer service**
+    - [ ] Implement create/retrieve/update customer API logic.
+    - [ ] Support configurable customer attributes mapping.
+    - [ ] Add reconciliation helper entry points.
+    - [ ] Verification: Integration tests with Stripe test mode for create/update flows.
+    - [ ] Definition of Done: Reconciliation caveats documented.
+  - [ ] **Task M2-T2: Payment method management**
+    - [ ] Implement add/update/default logic.
+    - [ ] Persist normalized payment method summary + raw payload.
+    - [ ] Implement detach cleanup.
+    - [ ] Verification: Integration tests for default method switching and detached method cleanup.
+    - [ ] Definition of Done: Cookbook example for SetupIntent + attach flow published.
+  - [ ] **Task M2-T3: Charges and refunds**
+    - [ ] Implement `charge`, `authorize`, `capture`, `refund` APIs.
+    - [ ] Persist receipt URL, tax fields, refund totals, payment method snapshots.
+    - [ ] Wrap Stripe exceptions into Solidus errors.
+    - [ ] Verification: Integration tests: successful charge, failed charge, partial refund, multiple refunds.
+    - [ ] Definition of Done: Error handling guide and retry guidance published.
+  - [ ] **Task M2-T4: Subscription lifecycle**
+    - [ ] Implement create/cancel/cancelNow/resume/swap/changeQuantity/pause/unpause.
+    - [ ] Implement state helpers and period calculations.
+    - [ ] Implement retry failed payment and open invoice payment helpers.
+    - [ ] Verification: Integration tests for lifecycle transitions and SCA-required transitions.
+    - [ ] Definition of Done: State machine table documented.
 
-#### Task M1-T2: Sequelize schema and migrations
-- Subtasks:
-  - Implement models for customers, subscriptions, charges, payment methods, webhooks, merchants.
-  - Add unique constraints and indexes for idempotency and default semantics.
-  - Ship migration templates and integration instructions.
-- Verification:
-  - Migration up/down tests on PostgreSQL.
-  - Constraint tests (duplicate processor_id/event_id prevention).
-- Definition of Done:
-  - ERD and schema docs published.
+- [ ] **Milestone M3: Webhooks and Async Processing**
+  - [ ] **Task M3-T1: Express webhook adapter**
+    - [ ] Implement router factory + route-local raw body middleware.
+    - [ ] Verify signature with multiple webhook secrets support.
+    - [ ] Add clear startup/runtime diagnostics for misconfiguration.
+    - [ ] Verification: Tests for valid/invalid signatures, missing headers, wrong secret, parsed body failure.
+    - [ ] Definition of Done: Ready-to-copy Express setup docs published.
+  - [ ] **Task M3-T2: Persist-first webhook pipeline + queue adapter**
+    - [ ] Persist incoming events with idempotency keys.
+    - [ ] Implement `inline` and `db-outbox` processing adapters.
+    - [ ] Add retry and dead-letter behavior.
+    - [ ] Verification: Tests for duplicate events, transient handler errors, retry/backoff behavior.
+    - [ ] Definition of Done: Operational runbook for stuck/retrying webhooks published.
+  - [ ] **Task M3-T3: Stripe event handler parity implementation**
+    - [ ] Implement handlers for all events listed in `pay-gem-research/stripe-webhook-map.md`.
+    - [ ] Implement custom subscriber API (subscribe/unsubscribe/all).
+    - [ ] Ensure no duplicate notifications/side effects where Pay suppresses them.
+    - [ ] Verification: Event-by-event integration tests with fixture payloads.
+    - [ ] Definition of Done: Coverage matrix shows all mapped events implemented.
 
-#### Task M1-T3: Registration API (`pay_customer` equivalent)
-- Subtasks:
-  - Implement `registerCustomerModel` API.
-  - Implement owner resolution and client-reference safety helpers.
-  - Add examples for User model integration.
-- Verification:
-  - Unit tests for registration, default selection, owner resolution failures.
-- Definition of Done:
-  - API docs include migration guidance from Pay semantics.
+- [ ] **Milestone M4: Checkout, SCA, Metered Billing, Tax, Connect**
+  - [ ] **Task M4-T1: Checkout and Billing Portal APIs**
+    - [ ] Implement checkout helper for payment/setup/subscription modes.
+    - [ ] Support success/cancel URL helpers and session id propagation helper.
+    - [ ] Implement billing portal session helper.
+    - [ ] Verification: Integration tests per mode.
+    - [ ] Definition of Done: Example app walkthrough covers checkout completion + webhook sync.
+  - [ ] **Task M4-T2: SCA and action-required workflow**
+    - [ ] Implement `ActionRequiredError` mapping.
+    - [ ] Provide continuation contract (`paymentIntentId`, `clientSecret`, recommended next action).
+    - [ ] Publish Express-oriented confirmation flow recipes.
+    - [ ] Verification: Integration tests with SCA-required test cards.
+    - [ ] Definition of Done: Troubleshooting section for common SCA failures published.
+  - [ ] **Task M4-T3: Metered billing and tax**
+    - [ ] Implement meter event APIs.
+    - [ ] Support automatic tax options and tax field persistence.
+    - [ ] Add migration notes for usage-records-to-meters path.
+    - [ ] Verification: Integration tests for meter event creation and taxed invoice projections.
+    - [ ] Definition of Done: Tax + metering cookbook docs published.
+  - [ ] **Task M4-T4: Stripe Connect parity**
+    - [ ] Implement merchant model and account flows.
+    - [ ] Implement account onboarding and status update handling.
+    - [ ] Implement transfer helpers where applicable.
+    - [ ] Verification: Integration tests for account creation/onboarding status sync.
+    - [ ] Definition of Done: Connect feature parity checklist signed off.
 
-### Milestone M2: Stripe Customer, Payment Method, Charge, Subscription APIs
-
-#### Task M2-T1: Stripe customer service
-- Subtasks:
-  - Implement create/retrieve/update customer API logic.
-  - Support configurable customer attributes mapping.
-  - Add reconciliation helper entry points.
-- Verification:
-  - Integration tests with Stripe test mode for create/update flows.
-- Definition of Done:
-  - Reconciliation caveats documented.
-
-#### Task M2-T2: Payment method management
-- Subtasks:
-  - Implement add/update/default logic.
-  - Persist normalized payment method summary + raw payload.
-  - Implement detach cleanup.
-- Verification:
-  - Integration tests for default method switching and detached method cleanup.
-- Definition of Done:
-  - Cookbook example for SetupIntent + attach flow published.
-
-#### Task M2-T3: Charges and refunds
-- Subtasks:
-  - Implement `charge`, `authorize`, `capture`, `refund` APIs.
-  - Persist receipt URL, tax fields, refund totals, payment method snapshots.
-  - Wrap Stripe exceptions into Solidus errors.
-- Verification:
-  - Integration tests: successful charge, failed charge, partial refund, multiple refunds.
-- Definition of Done:
-  - Error handling guide and retry guidance published.
-
-#### Task M2-T4: Subscription lifecycle
-- Subtasks:
-  - Implement create/cancel/cancelNow/resume/swap/changeQuantity/pause/unpause.
-  - Implement state helpers and period calculations.
-  - Implement retry failed payment and open invoice payment helpers.
-- Verification:
-  - Integration tests for lifecycle transitions and SCA-required transitions.
-- Definition of Done:
-  - State machine table documented.
-
-### Milestone M3: Webhooks and Async Processing
-
-#### Task M3-T1: Express webhook adapter
-- Subtasks:
-  - Implement router factory + route-local raw body middleware.
-  - Verify signature with multiple webhook secrets support.
-  - Add clear startup/runtime diagnostics for misconfiguration.
-- Verification:
-  - Tests for valid/invalid signatures, missing headers, wrong secret, parsed body failure.
-- Definition of Done:
-  - Ready-to-copy Express setup docs published.
-
-#### Task M3-T2: Persist-first webhook pipeline + queue adapter
-- Subtasks:
-  - Persist incoming events with idempotency keys.
-  - Implement `inline` and `db-outbox` processing adapters.
-  - Add retry and dead-letter behavior.
-- Verification:
-  - Tests for duplicate events, transient handler errors, retry/backoff behavior.
-- Definition of Done:
-  - Operational runbook for stuck/retrying webhooks published.
-
-#### Task M3-T3: Stripe event handler parity implementation
-- Subtasks:
-  - Implement handlers for all events listed in `pay-gem-research/stripe-webhook-map.md`.
-  - Implement custom subscriber API (subscribe/unsubscribe/all).
-  - Ensure no duplicate notifications/side effects where Pay suppresses them.
-- Verification:
-  - Event-by-event integration tests with fixture payloads.
-- Definition of Done:
-  - Coverage matrix shows all mapped events implemented.
-
-### Milestone M4: Checkout, SCA, Metered Billing, Tax, Connect
-
-#### Task M4-T1: Checkout and Billing Portal APIs
-- Subtasks:
-  - Implement checkout helper for payment/setup/subscription modes.
-  - Support success/cancel URL helpers and session id propagation helper.
-  - Implement billing portal session helper.
-- Verification:
-  - Integration tests per mode.
-- Definition of Done:
-  - Example app walkthrough covers checkout completion + webhook sync.
-
-#### Task M4-T2: SCA and action-required workflow
-- Subtasks:
-  - Implement `ActionRequiredError` mapping.
-  - Provide continuation contract (`paymentIntentId`, `clientSecret`, recommended next action).
-  - Publish Express-oriented confirmation flow recipes.
-- Verification:
-  - Integration tests with SCA-required test cards.
-- Definition of Done:
-  - Troubleshooting section for common SCA failures published.
-
-#### Task M4-T3: Metered billing and tax
-- Subtasks:
-  - Implement meter event APIs.
-  - Support automatic tax options and tax field persistence.
-  - Add migration notes for usage-records-to-meters path.
-- Verification:
-  - Integration tests for meter event creation and taxed invoice projections.
-- Definition of Done:
-  - Tax + metering cookbook docs published.
-
-#### Task M4-T4: Stripe Connect parity
-- Subtasks:
-  - Implement merchant model and account flows.
-  - Implement account onboarding and status update handling.
-  - Implement transfer helpers where applicable.
-- Verification:
-  - Integration tests for account creation/onboarding status sync.
-- Definition of Done:
-  - Connect feature parity checklist signed off.
-
-### Milestone M5: Runtime Compatibility, Observability, and Release
-
-#### Task M5-T1: Node/Bun/Deno compatibility hardening
-- Subtasks:
-  - Add runtime CI matrix.
-  - Isolate Node-specific code paths in adapters.
-  - Publish compatibility caveats and supported versions.
-- Verification:
-  - Runtime matrix tests green.
-- Definition of Done:
-  - Compatibility table in docs published.
-
-#### Task M5-T2: Observability and operations
-- Subtasks:
-  - Add structured logging and metric hooks.
-  - Add health diagnostics and webhook lag metrics.
-  - Add runbooks for secret rotation and outage handling.
-- Verification:
-  - Smoke tests for emitted metrics/log fields.
-- Definition of Done:
-  - Operations section included in docs.
-
-#### Task M5-T3: Packaging and release process
-- Subtasks:
-  - Finalize facade package APIs and versioning policy.
-  - Ship migration guide from ad hoc Stripe integrations.
-  - Publish first stable release candidate.
-- Verification:
-  - End-to-end example app in CI.
-- Definition of Done:
-  - Release notes and upgrade guide published.
+- [ ] **Milestone M5: Runtime Compatibility, Observability, and Release**
+  - [ ] **Task M5-T1: Node/Bun/Deno compatibility hardening**
+    - [ ] Add runtime CI matrix.
+    - [ ] Isolate Node-specific code paths in adapters.
+    - [ ] Publish compatibility caveats and supported versions.
+    - [ ] Verification: Runtime matrix tests green.
+    - [ ] Definition of Done: Compatibility table in docs published.
+  - [ ] **Task M5-T2: Observability and operations**
+    - [ ] Add structured logging and metric hooks.
+    - [ ] Add health diagnostics and webhook lag metrics.
+    - [ ] Add runbooks for secret rotation and outage handling.
+    - [ ] Verification: Smoke tests for emitted metrics/log fields.
+    - [ ] Definition of Done: Operations section included in docs.
+  - [ ] **Task M5-T3: Packaging and release process**
+    - [ ] Finalize facade package APIs and versioning policy.
+    - [ ] Ship migration guide from ad hoc Stripe integrations.
+    - [ ] Publish first stable release candidate.
+    - [ ] Verification: End-to-end example app in CI.
+    - [ ] Definition of Done: Release notes and upgrade guide published.
 
 ## 11. Dependencies
 

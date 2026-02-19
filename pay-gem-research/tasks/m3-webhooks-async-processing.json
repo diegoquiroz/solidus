@@ -1,0 +1,72 @@
+{
+  "name": "Solidus Milestone M3 - Webhooks and Async Processing",
+  "branchName": "ralph/solidus-m3-webhooks-async",
+  "description": "Implement Stripe webhook ingestion, persist-first async processing, and event handler parity.",
+  "userStories": [
+    {
+      "id": "US-001",
+      "title": "Build Express webhook adapter",
+      "description": "As an integrator, I want a safe Express webhook adapter so Stripe events are verified and ingested correctly.",
+      "acceptanceCriteria": [
+        "Implement webhook router factory and route-local raw body middleware",
+        "Verify signatures with support for multiple webhook secrets",
+        "Add startup and runtime diagnostics for webhook misconfiguration",
+        "Pass tests for valid and invalid signatures, missing headers, wrong secret, and parsed-body failure",
+        "Publish copy-ready Express setup documentation",
+        "pnpm lint passes",
+        "pnpm typecheck passes",
+        "pnpm test passes",
+        "pnpm test:integration passes"
+      ],
+      "priority": 1,
+      "passes": false,
+      "notes": "",
+      "dependsOn": []
+    },
+    {
+      "id": "US-002",
+      "title": "Implement persist-first webhook pipeline and queue adapters",
+      "description": "As an operations engineer, I want durable webhook persistence and retries so transient failures do not lose events.",
+      "acceptanceCriteria": [
+        "Persist incoming webhook events with idempotency keys",
+        "Implement inline and db-outbox processing adapters",
+        "Add retry and dead-letter behavior",
+        "Pass tests for duplicate events, transient handler errors, and retry-backoff behavior",
+        "Publish operational runbook for stuck or retrying webhooks",
+        "pnpm lint passes",
+        "pnpm typecheck passes",
+        "pnpm test passes",
+        "pnpm test:integration passes"
+      ],
+      "priority": 2,
+      "passes": false,
+      "notes": "",
+      "dependsOn": [
+        "US-001"
+      ]
+    },
+    {
+      "id": "US-003",
+      "title": "Implement Stripe event handler parity",
+      "description": "As a maintainer, I want parity with mapped Pay webhook events so projections and lifecycle behavior stay complete.",
+      "acceptanceCriteria": [
+        "Implement handlers for all events listed in pay-gem-research/stripe-webhook-map.md",
+        "Implement custom subscriber API for subscribe, unsubscribe, and all",
+        "Prevent duplicate notifications or side effects where Pay suppresses them",
+        "Pass event-by-event integration tests using fixture payloads",
+        "Publish coverage matrix proving all mapped events are implemented",
+        "pnpm lint passes",
+        "pnpm typecheck passes",
+        "pnpm test passes",
+        "pnpm test:integration passes"
+      ],
+      "priority": 3,
+      "passes": false,
+      "notes": "",
+      "dependsOn": [
+        "US-001",
+        "US-002"
+      ]
+    }
+  ]
+}

@@ -1,0 +1,96 @@
+{
+  "name": "Solidus Milestone M2 - Stripe Core APIs",
+  "branchName": "ralph/solidus-m2-stripe-core-apis",
+  "description": "Deliver Stripe customer, payment method, charge, and subscription lifecycle APIs with parity-focused behavior.",
+  "userStories": [
+    {
+      "id": "US-001",
+      "title": "Implement Stripe customer service",
+      "description": "As a developer, I want reliable create, retrieve, and update customer flows so app records stay aligned with Stripe.",
+      "acceptanceCriteria": [
+        "Implement create, retrieve, and update customer API logic",
+        "Support configurable customer attribute mapping",
+        "Provide reconciliation helper entry points",
+        "Pass Stripe test-mode integration tests for create and update flows",
+        "Document reconciliation caveats",
+        "pnpm lint passes",
+        "pnpm typecheck passes",
+        "pnpm test passes",
+        "pnpm test:integration passes"
+      ],
+      "priority": 1,
+      "passes": false,
+      "notes": "",
+      "dependsOn": []
+    },
+    {
+      "id": "US-002",
+      "title": "Implement payment method management",
+      "description": "As a developer, I want add, update, default, and detach payment method flows so customers can manage billing sources safely.",
+      "acceptanceCriteria": [
+        "Implement add, update, and default payment method logic",
+        "Persist normalized payment method summary plus raw payload",
+        "Implement detach cleanup behavior",
+        "Pass integration tests for default method switching and detached method cleanup",
+        "Publish cookbook example for SetupIntent plus attach flow",
+        "pnpm lint passes",
+        "pnpm typecheck passes",
+        "pnpm test passes",
+        "pnpm test:integration passes"
+      ],
+      "priority": 2,
+      "passes": false,
+      "notes": "",
+      "dependsOn": [
+        "US-001"
+      ]
+    },
+    {
+      "id": "US-003",
+      "title": "Implement charges and refunds APIs",
+      "description": "As a product engineer, I want one-time payments and refund operations so apps can support complete payment flows.",
+      "acceptanceCriteria": [
+        "Implement charge, authorize, capture, and refund APIs",
+        "Persist receipt URL, tax fields, refund totals, and payment method snapshots",
+        "Wrap Stripe exceptions into Solidus error types",
+        "Pass integration tests for successful charge, failed charge, partial refund, and multiple refunds",
+        "Publish error handling and retry guidance",
+        "pnpm lint passes",
+        "pnpm typecheck passes",
+        "pnpm test passes",
+        "pnpm test:integration passes"
+      ],
+      "priority": 3,
+      "passes": false,
+      "notes": "",
+      "dependsOn": [
+        "US-001",
+        "US-002"
+      ]
+    },
+    {
+      "id": "US-004",
+      "title": "Implement subscription lifecycle APIs",
+      "description": "As a SaaS team, I want full subscription lifecycle controls so pricing and access states remain accurate.",
+      "acceptanceCriteria": [
+        "Implement create, cancel, cancelNow, resume, swap, changeQuantity, pause, and unpause operations",
+        "Implement subscription state helpers and billing period calculations",
+        "Implement retry failed payment and open invoice payment helpers",
+        "Pass integration tests for lifecycle transitions and SCA-required transitions",
+        "Document subscription state machine table",
+        "pnpm lint passes",
+        "pnpm typecheck passes",
+        "pnpm test passes",
+        "pnpm test:integration passes"
+      ],
+      "priority": 4,
+      "passes": false,
+      "notes": "",
+      "dependsOn": [
+        "US-001",
+        "US-002",
+        "US-003"
+      ]
+    }
+  ]
+}

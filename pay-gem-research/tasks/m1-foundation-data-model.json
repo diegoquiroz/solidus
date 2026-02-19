@@ -1,0 +1,74 @@
+{
+  "name": "Solidus Milestone M1 - Foundation and Data Model",
+  "branchName": "ralph/solidus-m1-foundation-data-model",
+  "description": "Establish package contracts, persistence schema, and customer registration primitives for Solidus.",
+  "userStories": [
+    {
+      "id": "US-001",
+      "title": "Create package skeleton and core contracts",
+      "description": "As a maintainer, I want a clear package structure and core interfaces so Stripe and framework adapters can evolve safely.",
+      "acceptanceCriteria": [
+        "Create package structure: core, stripe, express, sequelize, and facade packages",
+        "Define core interfaces for customer registry, repositories, queue adapter, and event bus",
+        "Define error taxonomy including ActionRequiredError and ProviderError",
+        "Compile and typecheck all packages",
+        "Add contract tests for interface behavior with fake adapters",
+        "Publish generated public API docs for core contracts",
+        "pnpm lint passes",
+        "pnpm typecheck passes",
+        "pnpm test passes",
+        "pnpm test:integration passes"
+      ],
+      "priority": 1,
+      "passes": false,
+      "notes": "",
+      "dependsOn": []
+    },
+    {
+      "id": "US-002",
+      "title": "Implement Sequelize schema and migrations",
+      "description": "As a platform engineer, I want durable billing projections and idempotency constraints so webhook processing remains consistent.",
+      "acceptanceCriteria": [
+        "Implement models for customers, subscriptions, charges, payment methods, webhooks, and merchants",
+        "Add unique constraints and indexes for idempotency and default semantics",
+        "Provide migration templates and integration instructions",
+        "Pass migration up and down tests on PostgreSQL",
+        "Pass constraint tests preventing duplicate processor_id and event_id",
+        "Publish ERD and schema documentation",
+        "pnpm lint passes",
+        "pnpm typecheck passes",
+        "pnpm test passes",
+        "pnpm test:integration passes"
+      ],
+      "priority": 2,
+      "passes": false,
+      "notes": "",
+      "dependsOn": [
+        "US-001"
+      ]
+    },
+    {
+      "id": "US-003",
+      "title": "Build customer model registration API",
+      "description": "As a TypeScript developer, I want a pay_customer-equivalent registration API so application models can safely map to billing customers.",
+      "acceptanceCriteria": [
+        "Implement registerCustomerModel API",
+        "Implement owner resolution and client-reference safety helpers",
+        "Add examples for User model integration",
+        "Pass unit tests for registration, default selection, and owner resolution failures",
+        "Publish API docs including migration guidance from Pay semantics",
+        "pnpm lint passes",
+        "pnpm typecheck passes",
+        "pnpm test passes",
+        "pnpm test:integration passes"
+      ],
+      "priority": 3,
+      "passes": false,
+      "notes": "",
+      "dependsOn": [
+        "US-001",
+        "US-002"
+      ]
+    }
+  ]
+}

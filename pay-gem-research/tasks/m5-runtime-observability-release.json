@@ -1,0 +1,72 @@
+{
+  "name": "Solidus Milestone M5 - Runtime Compatibility, Observability, and Release",
+  "branchName": "ralph/solidus-m5-runtime-observability-release",
+  "description": "Harden runtime support, improve operations visibility, and publish release process for stable delivery.",
+  "userStories": [
+    {
+      "id": "US-001",
+      "title": "Harden Node, Bun, and Deno compatibility",
+      "description": "As a library maintainer, I want runtime compatibility guarantees so users can adopt Solidus confidently.",
+      "acceptanceCriteria": [
+        "Add runtime CI matrix for Node, Bun, and Deno",
+        "Isolate Node-specific code paths in adapters",
+        "Publish compatibility caveats and supported versions",
+        "Pass runtime matrix test suite",
+        "Publish runtime compatibility table in docs",
+        "pnpm lint passes",
+        "pnpm typecheck passes",
+        "pnpm test passes",
+        "pnpm test:integration passes"
+      ],
+      "priority": 1,
+      "passes": false,
+      "notes": "",
+      "dependsOn": []
+    },
+    {
+      "id": "US-002",
+      "title": "Implement observability and operations support",
+      "description": "As an operator, I want structured telemetry and runbooks so billing incidents can be detected and resolved quickly.",
+      "acceptanceCriteria": [
+        "Add structured logging and metric hooks",
+        "Add health diagnostics and webhook lag metrics",
+        "Add runbooks for webhook secret rotation and outage handling",
+        "Pass smoke tests for emitted metrics and log fields",
+        "Include operations section in public docs",
+        "pnpm lint passes",
+        "pnpm typecheck passes",
+        "pnpm test passes",
+        "pnpm test:integration passes"
+      ],
+      "priority": 2,
+      "passes": false,
+      "notes": "",
+      "dependsOn": [
+        "US-001"
+      ]
+    },
+    {
+      "id": "US-003",
+      "title": "Finalize packaging and release process",
+      "description": "As a maintainer, I want a reliable release workflow so stable versions and migration guidance are easy to consume.",
+      "acceptanceCriteria": [
+        "Finalize facade package APIs and versioning policy",
+        "Publish migration guide from ad hoc Stripe integrations",
+        "Publish first stable release candidate",
+        "Pass end-to-end example app workflow in CI",
+        "Publish release notes and upgrade guide",
+        "pnpm lint passes",
+        "pnpm typecheck passes",
+        "pnpm test passes",
+        "pnpm test:integration passes"
+      ],
+      "priority": 3,
+      "passes": false,
+      "notes": "",
+      "dependsOn": [
+        "US-001",
+        "US-002"
+      ]
+    }
+  ]
+}
