@@ -113,6 +113,13 @@ function createFakeStripe(): Stripe {
   const paymentIntents = new Map<string, Stripe.PaymentIntent>();
   const charges = new Map<string, Stripe.Charge>();
   const subscriptions = new Map<string, Stripe.Subscription>();
+  const accounts = new Map<string, Stripe.Account>();
+
+  let lastSubscriptionCreateParams: Stripe.SubscriptionCreateParams | undefined;
+  let lastCheckoutCreateParams: Stripe.Checkout.SessionCreateParams | undefined;
+  let lastBillingPortalCreateParams: Stripe.BillingPortal.SessionCreateParams | undefined;
+  let lastMeterEventParams: Record<string, unknown> | undefined;
+  let lastTransferCreateParams: Stripe.TransferCreateParams | undefined;
 
   const createCustomer = async (params: Stripe.CustomerCreateParams): Promise<Stripe.Customer> => {
     const customer = {
@@ -213,6 +220,19 @@ function createFakeStripe(): Stripe {
   const createPaymentIntent = async (
     params: Stripe.PaymentIntentCreateParams,
   ): Promise<Stripe.PaymentIntent> => {
+    if (params.amount === 4100) {
+      throw {
+        type: "StripeCardError",
+        code: "authentication_required",
+        message: "Authentication required",
+        payment_intent: {
+          id: "pi_action",
+          client_secret: "pi_action_secret",
+          status: "requires_action",
+        },
+      };
+    }
+
     if (params.amount === 4000) {
       throw { type: "StripeCardError", code: "card_declined", message: "Declined" };
     }
@@ -300,6 +320,8 @@ function createFakeStripe(): Stripe {
   const createSubscription = async (
     params: Stripe.SubscriptionCreateParams,
   ): Promise<Stripe.Subscription> => {
+    lastSubscriptionCreateParams = params;
+
     const subscription = {
       id: `sub_${subscriptions.size + 1}`,
       object: "subscription",
@@ -385,6 +407,114 @@ function createFakeStripe(): Stripe {
     } as Stripe.ApiList<Stripe.Invoice>;
   };
 
+  const createCheckoutSession = async (
+    params: Stripe.Checkout.SessionCreateParams,
+  ): Promise<Stripe.Checkout.Session> => {
+    lastCheckoutCreateParams = params;
+
+    return {
+      id: `cs_${Date.now()}`,
+      object: "checkout.session",
+      mode: params.mode,
+      customer: params.customer ?? null,
+      customer_email: params.customer_email ?? null,
+      success_url: params.success_url ?? null,
+      cancel_url: params.cancel_url ?? null,
+      return_url: params.return_url ?? null,
+      metadata: (params.metadata ?? {}) as Stripe.Metadata,
+      url: "https://stripe.test/checkout/session",
+    } as Stripe.Checkout.Session;
+  };
+
+  const createBillingPortalSession = async (
+    params: Stripe.BillingPortal.SessionCreateParams,
+  ): Promise<Stripe.BillingPortal.Session> => {
+    lastBillingPortalCreateParams = params;
+
+    return {
+      id: "bps_1",
+      object: "billing_portal.session",
+      customer: params.customer,
+      return_url: params.return_url ?? null,
+      url: "https://stripe.test/billing-portal/session",
+    } as Stripe.BillingPortal.Session;
+  };
+
+  const createMeterEvent = async (params: {
+    event_name: string;
+    payload: Record<string, string>;
+    identifier?: string;
+    timestamp?: number;
+  }): Promise<{ id: string; event_name: string }> => {
+    lastMeterEventParams = params;
+
+    return {
+      id: "mev_1",
+      event_name: params.event_name,
+    };
+  };
+
+  const createAccount = async (params: Stripe.AccountCreateParams): Promise<Stripe.Account> => {
+    const account = {
+      id: `acct_${accounts.size + 1}`,
+      object: "account",
+      type: params.type ?? "express",
+      email: params.email ?? null,
+      metadata: (params.metadata ?? {}) as Stripe.Metadata,
+      charges_enabled: false,
+      payouts_enabled: false,
+      details_submitted: false,
+      requirements: {
+        currently_due: ["external_account"],
+      },
+    } as Stripe.Account;
+
+    accounts.set(account.id, account);
+    return account;
+  };
+
+  const retrieveAccount = async (id: string): Promise<Stripe.Account> => {
+    const account = accounts.get(id);
+
+    if (!account) {
+      throw { type: "StripeInvalidRequestError", code: "resource_missing", message: "Missing" };
+    }
+
+    return account;
+  };
+
+  const createAccountLink = async (
+    params: Stripe.AccountLinkCreateParams,
+  ): Promise<Stripe.AccountLink> => {
+    return {
+      object: "account_link",
+      created: Math.floor(Date.now() / 1000),
+      expires_at: Math.floor(Date.now() / 1000) + 600,
+      url: `https://stripe.test/account-link/${params.account}`,
+    } as Stripe.AccountLink;
+  };
+
+  const createLoginLink = async (_id: string): Promise<Stripe.LoginLink> => {
+    return {
+      object: "login_link",
+      created: Math.floor(Date.now() / 1000),
+      url: "https://stripe.test/login-link",
+    } as Stripe.LoginLink;
+  };
+
+  const createTransfer = async (params: Stripe.TransferCreateParams): Promise<Stripe.Transfer> => {
+    lastTransferCreateParams = params;
+
+    return {
+      id: "tr_1",
+      object: "transfer",
+      amount: params.amount,
+      currency: params.currency,
+      destination: params.destination as string,
+      metadata: (params.metadata ?? {}) as Stripe.Metadata,
+    } as Stripe.Transfer;
+  };
+
   return {
     customers: {
       create: createCustomer,
@@ -423,12 +553,55 @@ function createFakeStripe(): Stripe {
       update: updateSubscription,
       cancel: cancelSubscription,
     },
+    checkout: {
+      sessions: {
+        create: createCheckoutSession,
+      },
+    },
+    billingPortal: {
+      sessions: {
+        create: createBillingPortalSession,
+      },
+    },
+    billing: {
+      meterEvents: {
+        create: createMeterEvent,
+      },
+    },
+    accounts: {
+      create: createAccount,
+      retrieve: retrieveAccount,
+      createLoginLink,
+    },
+    accountLinks: {
+      create: createAccountLink,
+    },
+    transfers: {
+      create: createTransfer,
+    },
     invoices: {
       list: listInvoices,
       pay: async (_id: string) => ({ id: "in_1", object: "invoice" }) as Stripe.Invoice,
     },
+    __testState: {
+      getLastSubscriptionCreateParams: () => lastSubscriptionCreateParams,
+      getLastCheckoutCreateParams: () => lastCheckoutCreateParams,
+      getLastBillingPortalCreateParams: () => lastBillingPortalCreateParams,
+      getLastMeterEventParams: () => lastMeterEventParams,
+      getLastTransferCreateParams: () => lastTransferCreateParams,
+    },
   } as unknown as Stripe;
 }
+
+type FakeStripeWithState = Stripe & {
+  __testState: {
+    getLastSubscriptionCreateParams(): Stripe.SubscriptionCreateParams | undefined;
+    getLastCheckoutCreateParams(): Stripe.Checkout.SessionCreateParams | undefined;
+    getLastBillingPortalCreateParams(): Stripe.BillingPortal.SessionCreateParams | undefined;
+    getLastMeterEventParams(): Record<string, unknown> | undefined;
+    getLastTransferCreateParams(): Stripe.TransferCreateParams | undefined;
+  };
+};
 
 describe("stripe core APIs", () => {
   test("creates, updates, and reconciles customers", async () => {
@@ -528,10 +701,139 @@ describe("stripe core APIs", () => {
     ).rejects.toBeInstanceOf(ProviderError);
   });
 
+  test("creates checkout sessions for payment, setup, and subscription", async () => {
+    const stripe = createFakeStripe() as FakeStripeWithState;
+    const api = createStripeCoreApi({ stripe });
+
+    const paymentSession = await api.checkout.createPaymentSession({
+      customerId: "cus_1",
+      successUrl: "https://app.example/success",
+      cancelUrl: "https://app.example/cancel?flow=checkout",
+      lineItems: [{ price: "price_basic", quantity: 1 }],
+      stripeOptions: {
+        automatic_tax: { enabled: true },
+      },
+    });
+
+    const setupSession = await api.checkout.createSetupSession({
+      customerId: "cus_1",
+      successUrl: "https://app.example/setup/success",
+      cancelUrl: "https://app.example/setup/cancel",
+      returnUrl: "https://app.example/setup/return",
+    });
+
+    const subscriptionSession = await api.checkout.createSubscriptionSession({
+      customerId: "cus_1",
+      successUrl: "https://app.example/subscription/success",
+      cancelUrl: "https://app.example/subscription/cancel",
+      lineItems: [{ price: "price_metered", quantity: 1 }],
+      stripeOptions: {
+        automatic_tax: { enabled: true },
+      },
+    });
+
+    const withSessionId = api.checkout.withSessionIdUrls({
+      successUrl: "https://app.example/success",
+      cancelUrl: "https://app.example/cancel?flow=checkout",
+      returnUrl: "https://app.example/return",
+    });
+    const appendedOnce = api.checkout.appendSessionIdToUrl("https://app.example/success");
+    const appendedTwice = api.checkout.appendSessionIdToUrl(appendedOnce);
+
+    expect(paymentSession.mode).toBe("payment");
+    expect(setupSession.mode).toBe("setup");
+    expect(subscriptionSession.mode).toBe("subscription");
+    expect(withSessionId.successUrl).toContain("stripe_checkout_session_id={CHECKOUT_SESSION_ID}");
+    expect(withSessionId.cancelUrl).toContain("flow=checkout&stripe_checkout_session_id={CHECKOUT_SESSION_ID}");
+    expect(withSessionId.returnUrl).toContain("stripe_checkout_session_id={CHECKOUT_SESSION_ID}");
+    expect(appendedTwice).toBe(appendedOnce);
+    expect(stripe.__testState.getLastCheckoutCreateParams()?.automatic_tax?.enabled).toBe(true);
+  });
+
+  test("creates billing portal sessions and meter events", async () => {
+    const stripe = createFakeStripe() as FakeStripeWithState;
+    const api = createStripeCoreApi({ stripe });
+
+    const portalSession = await api.billingPortal.createSession({
+      customerId: "cus_1",
+      returnUrl: "https://app.example/billing",
+    });
+
+    const meterEvent = await api.meters.createEvent({
+      eventName: "tokens_used",
+      payload: {
+        stripe_customer_id: "cus_1",
+        value: "42",
+      },
+    });
+
+    expect(portalSession.customer).toBe("cus_1");
+    expect(stripe.__testState.getLastBillingPortalCreateParams()?.return_url).toBe(
+      "https://app.example/billing",
+    );
+    expect(meterEvent).toMatchObject({ id: "mev_1" });
+    expect(stripe.__testState.getLastMeterEventParams()).toMatchObject({ event_name: "tokens_used" });
+  });
+
+  test("supports connect account workflows", async () => {
+    const stripe = createFakeStripe() as FakeStripeWithState;
+    const api = createStripeCoreApi({ stripe });
+
+    const account = await api.connect.createAccount({
+      type: "express",
+      country: "US",
+      email: "connect@example.com",
+    });
+
+    const retrieved = await api.connect.retrieveAccount(account.id);
+    const link = await api.connect.createAccountLink({
+      accountId: account.id,
+      refreshUrl: "https://app.example/connect/refresh",
+      returnUrl: "https://app.example/connect/return",
+    });
+    const loginLink = await api.connect.createLoginLink({ accountId: account.id });
+    const transfer = await api.connect.createTransfer({
+      amount: 700,
+      currency: "usd",
+      destinationAccountId: account.id,
+      transferGroup: "order_123",
+    });
+
+    expect(retrieved.id).toBe(account.id);
+    expect(link.object).toBe("account_link");
+    expect(loginLink.object).toBe("login_link");
+    expect(transfer.destination).toBe(account.id);
+    expect(stripe.__testState.getLastTransferCreateParams()?.transfer_group).toBe("order_123");
+  });
+
+  test("includes continuation details for action required errors", async () => {
+    const api = createStripeCoreApi({ stripe: createFakeStripe() });
+    await api.customers.create({ email: "sca@example.com" });
+
+    try {
+      await api.charges.charge({
+        customerId: "cus_1",
+        amount: 4100,
+        currency: "usd",
+      });
+      throw new Error("Expected charge to require action");
+    } catch (error: unknown) {
+      expect(error).toBeInstanceOf(ActionRequiredError);
+
+      const actionRequiredError = error as ActionRequiredError;
+      expect(actionRequiredError.details?.paymentIntentId).toBe("pi_action");
+      expect(actionRequiredError.details?.clientSecret).toBe("pi_action_secret");
+      expect(actionRequiredError.details?.recommendedNextAction).toBe(
+        "confirm_payment_with_client_secret",
+      );
+    }
+  });
+
   test("runs subscription lifecycle and state helpers", async () => {
     const subscriptionRepo = new InMemorySubscriptionRepo();
+    const stripe = createFakeStripe() as FakeStripeWithState;
     const api = createStripeCoreApi({
-      stripe: createFakeStripe(),
+      stripe,
       repositories: { subscriptions: subscriptionRepo },
     });
 
@@ -541,6 +843,9 @@ describe("stripe core APIs", () => {
       customerId: "cus_1",
       priceId: "price_basic",
       quantity: 1,
+      stripeOptions: {
+        automatic_tax: { enabled: true },
+      },
     });
 
     const canceled = await api.subscriptions.cancel(created.processorId);
@@ -574,6 +879,7 @@ describe("stripe core APIs", () => {
     expect(invoices.length).toBe(1);
     expect(retryInvoices.length).toBe(1);
     expect(subscriptionRepo.values.length).toBeGreaterThan(0);
+    expect(stripe.__testState.getLastSubscriptionCreateParams()?.automatic_tax?.enabled).toBe(true);
   });
 
   test("throws action required when swapping item-less subscriptions", async () => {

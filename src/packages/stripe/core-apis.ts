@@ -92,6 +92,106 @@ export interface StripeSubscriptionCreateInput {
   stripeOptions?: Omit<Stripe.SubscriptionCreateParams, "customer" | "items" | "metadata">;
 }
 
+export interface StripeCheckoutUrls {
+  successUrl?: string;
+  cancelUrl?: string;
+  returnUrl?: string;
+}
+
+interface StripeCheckoutSessionInputBase {
+  customerId?: string;
+  customerEmail?: string;
+  metadata?: Stripe.MetadataParam;
+  applySessionIdToUrls?: boolean;
+}
+
+export interface StripeCheckoutPaymentSessionInput extends StripeCheckoutSessionInputBase {
+  successUrl: string;
+  cancelUrl: string;
+  lineItems: Stripe.Checkout.SessionCreateParams.LineItem[];
+  stripeOptions?: Omit<
+    Stripe.Checkout.SessionCreateParams,
+    "mode" | "success_url" | "cancel_url" | "line_items" | "customer" | "customer_email" | "metadata"
+  >;
+}
+
+export interface StripeCheckoutSetupSessionInput extends StripeCheckoutSessionInputBase {
+  successUrl: string;
+  cancelUrl?: string;
+  returnUrl?: string;
+  stripeOptions?: Omit<
+    Stripe.Checkout.SessionCreateParams,
+    "mode" | "success_url" | "cancel_url" | "return_url" | "customer" | "customer_email" | "metadata"
+  >;
+}
+
+export interface StripeCheckoutSubscriptionSessionInput extends StripeCheckoutSessionInputBase {
+  successUrl: string;
+  cancelUrl: string;
+  lineItems: Stripe.Checkout.SessionCreateParams.LineItem[];
+  stripeOptions?: Omit<
+    Stripe.Checkout.SessionCreateParams,
+    "mode" | "success_url" | "cancel_url" | "line_items" | "customer" | "customer_email" | "metadata"
+  >;
+}
+
+export interface StripeBillingPortalSessionInput {
+  customerId: string;
+  returnUrl?: string;
+  stripeOptions?: Omit<Stripe.BillingPortal.SessionCreateParams, "customer" | "return_url">;
+}
+
+type StripeMeterEventCreateParams = Parameters<Stripe.Billing.MeterEventsResource["create"]>[0];
+type StripeMeterEventResponse = Awaited<ReturnType<Stripe.Billing.MeterEventsResource["create"]>>;
+
+export interface StripeMeterEventInput {
+  eventName: string;
+  payload: StripeMeterEventCreateParams["payload"];
+  identifier?: string;
+  timestamp?: number;
+  stripeOptions?: Omit<StripeMeterEventCreateParams, "event_name" | "payload" | "identifier" | "timestamp">;
+}
+
+export interface StripeConnectCreateAccountInput {
+  type?: Stripe.AccountCreateParams.Type;
+  country?: string;
+  email?: string;
+  capabilities?: Stripe.AccountCreateParams.Capabilities;
+  metadata?: Stripe.MetadataParam;
+  stripeOptions?: Omit<Stripe.AccountCreateParams, "type" | "country" | "email" | "capabilities" | "metadata">;
+}
+
+export interface StripeConnectAccountLinkInput {
+  accountId: string;
+  refreshUrl: string;
+  returnUrl: string;
+  type?: Stripe.AccountLinkCreateParams.Type;
+  collect?: Stripe.AccountLinkCreateParams.Collect;
+  stripeOptions?: Omit<
+    Stripe.AccountLinkCreateParams,
+    "account" | "refresh_url" | "return_url" | "type" | "collect"
+  >;
+}
+
+export interface StripeConnectLoginLinkInput {
+  accountId: string;
+  stripeOptions?: Stripe.AccountCreateLoginLinkParams;
+}
+
+export interface StripeConnectTransferInput {
+  amount: number;
+  currency: string;
+  destinationAccountId: string;
+  description?: string;
+  metadata?: Stripe.MetadataParam;
+  sourceTransaction?: string;
+  transferGroup?: string;
+  stripeOptions?: Omit<
+    Stripe.TransferCreateParams,
+    "amount" | "currency" | "destination" | "description" | "metadata" | "source_transaction" | "transfer_group"
+  >;
+}
+
 export interface StripeSubscriptionSwapInput {
   subscriptionId: string;
   priceId: string;
@@ -125,6 +225,23 @@ function toDate(unixTime?: number | null): Date | undefined {
   }
 
   return new Date(unixTime * 1000);
+}
+
+function appendCheckoutSessionId(url: string): string {
+  if (url.includes("stripe_checkout_session_id=")) {
+    return url;
+  }
+
+  const separator = url.includes("?") ? "&" : "?";
+  return `${url}${separator}stripe_checkout_session_id={CHECKOUT_SESSION_ID}`;
+}
+
+function withCheckoutSessionIdUrls(urls: StripeCheckoutUrls): StripeCheckoutUrls {
+  return {
+    successUrl: urls.successUrl === undefined ? undefined : appendCheckoutSessionId(urls.successUrl),
+    cancelUrl: urls.cancelUrl === undefined ? undefined : appendCheckoutSessionId(urls.cancelUrl),
+    returnUrl: urls.returnUrl === undefined ? undefined : appendCheckoutSessionId(urls.returnUrl),
+  };
 }
 
 function normalizePaymentMethod(
@@ -729,6 +846,186 @@ export function createStripeCoreApi(options: StripeCoreApiOptions) {
     },
   };
 
+  const checkout = {
+    appendSessionIdToUrl(url: string): string {
+      return appendCheckoutSessionId(url);
+    },
+
+    withSessionIdUrls(urls: StripeCheckoutUrls): StripeCheckoutUrls {
+      return withCheckoutSessionIdUrls(urls);
+    },
+
+    async createPaymentSession(input: StripeCheckoutPaymentSessionInput): Promise<Stripe.Checkout.Session> {
+      try {
+        const urls = input.applySessionIdToUrls === false
+          ? { successUrl: input.successUrl, cancelUrl: input.cancelUrl }
+          : withCheckoutSessionIdUrls({ successUrl: input.successUrl, cancelUrl: input.cancelUrl });
+
+        return await options.stripe.checkout.sessions.create({
+          mode: "payment",
+          success_url: urls.successUrl,
+          cancel_url: urls.cancelUrl,
+          line_items: input.lineItems,
+          customer: input.customerId,
+          customer_email: input.customerEmail,
+          metadata: input.metadata,
+          ...input.stripeOptions,
+        });
+      } catch (error: unknown) {
+        throw mapStripeError(error, "checkout.sessions.create(payment)");
+      }
+    },
+
+    async createSetupSession(input: StripeCheckoutSetupSessionInput): Promise<Stripe.Checkout.Session> {
+      try {
+        const urls = input.applySessionIdToUrls === false
+          ? {
+              successUrl: input.successUrl,
+              cancelUrl: input.cancelUrl,
+              returnUrl: input.returnUrl,
+            }
+          : withCheckoutSessionIdUrls({
+              successUrl: input.successUrl,
+              cancelUrl: input.cancelUrl,
+              returnUrl: input.returnUrl,
+            });
+
+        return await options.stripe.checkout.sessions.create({
+          mode: "setup",
+          success_url: urls.successUrl,
+          cancel_url: urls.cancelUrl,
+          return_url: urls.returnUrl,
+          customer: input.customerId,
+          customer_email: input.customerEmail,
+          metadata: input.metadata,
+          ...input.stripeOptions,
+        });
+      } catch (error: unknown) {
+        throw mapStripeError(error, "checkout.sessions.create(setup)");
+      }
+    },
+
+    async createSubscriptionSession(
+      input: StripeCheckoutSubscriptionSessionInput,
+    ): Promise<Stripe.Checkout.Session> {
+      try {
+        const urls = input.applySessionIdToUrls === false
+          ? { successUrl: input.successUrl, cancelUrl: input.cancelUrl }
+          : withCheckoutSessionIdUrls({ successUrl: input.successUrl, cancelUrl: input.cancelUrl });
+
+        return await options.stripe.checkout.sessions.create({
+          mode: "subscription",
+          success_url: urls.successUrl,
+          cancel_url: urls.cancelUrl,
+          line_items: input.lineItems,
+          customer: input.customerId,
+          customer_email: input.customerEmail,
+          metadata: input.metadata,
+          ...input.stripeOptions,
+        });
+      } catch (error: unknown) {
+        throw mapStripeError(error, "checkout.sessions.create(subscription)");
+      }
+    },
+  };
+
+  const billingPortal = {
+    async createSession(input: StripeBillingPortalSessionInput): Promise<Stripe.BillingPortal.Session> {
+      try {
+        return await options.stripe.billingPortal.sessions.create({
+          customer: input.customerId,
+          return_url: input.returnUrl,
+          ...input.stripeOptions,
+        });
+      } catch (error: unknown) {
+        throw mapStripeError(error, "billingPortal.sessions.create");
+      }
+    },
+  };
+
+  const meters = {
+    async createEvent(input: StripeMeterEventInput): Promise<StripeMeterEventResponse> {
+      try {
+        return await options.stripe.billing.meterEvents.create({
+          event_name: input.eventName,
+          payload: input.payload,
+          identifier: input.identifier,
+          timestamp: input.timestamp,
+          ...input.stripeOptions,
+        });
+      } catch (error: unknown) {
+        throw mapStripeError(error, "billing.meterEvents.create");
+      }
+    },
+  };
+
+  const connect = {
+    async createAccount(input: StripeConnectCreateAccountInput): Promise<Stripe.Account> {
+      try {
+        return await options.stripe.accounts.create({
+          type: input.type,
+          country: input.country,
+          email: input.email,
+          capabilities: input.capabilities,
+          metadata: input.metadata,
+          ...input.stripeOptions,
+        });
+      } catch (error: unknown) {
+        throw mapStripeError(error, "accounts.create");
+      }
+    },
+
+    async retrieveAccount(accountId: string): Promise<Stripe.Account> {
+      try {
+        return await options.stripe.accounts.retrieve(accountId);
+      } catch (error: unknown) {
+        throw mapStripeError(error, "accounts.retrieve");
+      }
+    },
+
+    async createAccountLink(input: StripeConnectAccountLinkInput): Promise<Stripe.AccountLink> {
+      try {
+        return await options.stripe.accountLinks.create({
+          account: input.accountId,
+          refresh_url: input.refreshUrl,
+          return_url: input.returnUrl,
+          type: input.type ?? "account_onboarding",
+          collect: input.collect,
+          ...input.stripeOptions,
+        });
+      } catch (error: unknown) {
+        throw mapStripeError(error, "accountLinks.create");
+      }
+    },
+
+    async createLoginLink(input: StripeConnectLoginLinkInput): Promise<Stripe.LoginLink> {
+      try {
+        return await options.stripe.accounts.createLoginLink(input.accountId, {
+          ...input.stripeOptions,
+        });
+      } catch (error: unknown) {
+        throw mapStripeError(error, "accounts.createLoginLink");
+      }
+    },
+
+    async createTransfer(input: StripeConnectTransferInput): Promise<Stripe.Transfer> {
+      try {
+        return await options.stripe.transfers.create({
+          amount: input.amount,
+          currency: input.currency,
+          destination: input.destinationAccountId,
+          description: input.description,
+          metadata: input.metadata,
+          source_transaction: input.sourceTransaction,
+          transfer_group: input.transferGroup,
+          ...input.stripeOptions,
+        });
+      } catch (error: unknown) {
+        throw mapStripeError(error, "transfers.create");
+      }
+    },
+  };
+
   const state = {
     subscribed(subscription: SubscriptionRecord): boolean {
       return ![
@@ -782,6 +1079,10 @@ export function createStripeCoreApi(options: StripeCoreApiOptions) {
     paymentMethods,
     charges,
     subscriptions,
+    checkout,
+    billingPortal,
+    meters,
+    connect,
     state,
   };
 }

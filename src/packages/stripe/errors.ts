@@ -34,6 +34,11 @@ export function mapStripeError(error: unknown, operation: string): Error {
         operation,
         paymentIntentId: stripeError.payment_intent?.id,
         clientSecret: stripeError.payment_intent?.client_secret ?? undefined,
+        recommendedNextAction:
+          stripeError.payment_intent?.client_secret === undefined ||
+          stripeError.payment_intent?.client_secret === null
+            ? "collect_new_payment_method"
+            : "confirm_payment_with_client_secret",
         stripeCode: stripeError.code,
       },
     });

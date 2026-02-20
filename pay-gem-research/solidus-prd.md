@@ -1,4 +1,5 @@
 [PRD]
+
 # PRD: Solidus (Stripe-first Pay Gem Port for Node/Bun/Deno)
 
 ## 1. Problem Statement and Business Context
@@ -8,11 +9,13 @@ The Ruby `pay` gem gives Rails teams a highly opinionated and low-friction way t
 Goal: create `solidus`, a Stripe-first library for JavaScript runtimes that delivers Pay-like feature completeness while initially constraining ecosystem compatibility to reduce delivery risk.
 
 Initial compatibility constraints (intentional):
+
 - Provider: Stripe only
 - Backend integration: Express only
 - ORM integration: sequelize-typescript only
 
 Strategic intent:
+
 - Make Solidus the practical "Pay gem alternative" for Node teams.
 - Preserve opinionated defaults and convenience APIs.
 - Keep architecture extensible for future providers/frameworks/ORMs.
@@ -197,31 +200,31 @@ Security/reliability gates:
     - [x] Verification: Event-by-event integration tests with fixture payloads.
     - [x] Definition of Done: Coverage matrix shows all mapped events implemented.
 
-- [ ] **Milestone M4: Checkout, SCA, Metered Billing, Tax, Connect**
-  - [ ] **Task M4-T1: Checkout and Billing Portal APIs**
-    - [ ] Implement checkout helper for payment/setup/subscription modes.
-    - [ ] Support success/cancel URL helpers and session id propagation helper.
-    - [ ] Implement billing portal session helper.
-    - [ ] Verification: Integration tests per mode.
-    - [ ] Definition of Done: Example app walkthrough covers checkout completion + webhook sync.
-  - [ ] **Task M4-T2: SCA and action-required workflow**
-    - [ ] Implement `ActionRequiredError` mapping.
-    - [ ] Provide continuation contract (`paymentIntentId`, `clientSecret`, recommended next action).
-    - [ ] Publish Express-oriented confirmation flow recipes.
-    - [ ] Verification: Integration tests with SCA-required test cards.
-    - [ ] Definition of Done: Troubleshooting section for common SCA failures published.
-  - [ ] **Task M4-T3: Metered billing and tax**
-    - [ ] Implement meter event APIs.
-    - [ ] Support automatic tax options and tax field persistence.
-    - [ ] Add migration notes for usage-records-to-meters path.
-    - [ ] Verification: Integration tests for meter event creation and taxed invoice projections.
-    - [ ] Definition of Done: Tax + metering cookbook docs published.
-  - [ ] **Task M4-T4: Stripe Connect parity**
-    - [ ] Implement merchant model and account flows.
-    - [ ] Implement account onboarding and status update handling.
-    - [ ] Implement transfer helpers where applicable.
-    - [ ] Verification: Integration tests for account creation/onboarding status sync.
-    - [ ] Definition of Done: Connect feature parity checklist signed off.
+- [x] **Milestone M4: Checkout, SCA, Metered Billing, Tax, Connect**
+  - [x] **Task M4-T1: Checkout and Billing Portal APIs**
+    - [x] Implement checkout helper for payment/setup/subscription modes.
+    - [x] Support success/cancel URL helpers and session id propagation helper.
+    - [x] Implement billing portal session helper.
+    - [x] Verification: Integration tests per mode.
+    - [x] Definition of Done: Example app walkthrough covers checkout completion + webhook sync.
+  - [x] **Task M4-T2: SCA and action-required workflow**
+    - [x] Implement `ActionRequiredError` mapping.
+    - [x] Provide continuation contract (`paymentIntentId`, `clientSecret`, recommended next action).
+    - [x] Publish Express-oriented confirmation flow recipes.
+    - [x] Verification: Integration tests with SCA-required test cards.
+    - [x] Definition of Done: Troubleshooting section for common SCA failures published.
+  - [x] **Task M4-T3: Metered billing and tax**
+    - [x] Implement meter event APIs.
+    - [x] Support automatic tax options and tax field persistence.
+    - [x] Add migration notes for usage-records-to-meters path.
+    - [x] Verification: Integration tests for meter event creation and taxed invoice projections.
+    - [x] Definition of Done: Tax + metering cookbook docs published.
+  - [x] **Task M4-T4: Stripe Connect parity**
+    - [x] Implement merchant model and account flows.
+    - [x] Implement account onboarding and status update handling.
+    - [x] Implement transfer helpers where applicable.
+    - [x] Verification: Integration tests for account creation/onboarding status sync.
+    - [x] Definition of Done: Connect feature parity checklist signed off.
 
 - [ ] **Milestone M5: Runtime Compatibility, Observability, and Release**
   - [ ] **Task M5-T1: Node/Bun/Deno compatibility hardening**
