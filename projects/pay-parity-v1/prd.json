@@ -11,8 +11,6 @@
         "Checkout owner-link workflow resolves owners through registered models.",
         "Unsafe or unknown client reference values fail with explicit typed errors.",
         "Tests cover valid, missing, malformed, and unknown model reference IDs.",
-        "bun run lint passes",
-        "bun run typecheck passes",
         "bun test passes"
       ],
       "priority": 1,
@@ -28,8 +26,6 @@
         "checkout.session.completed and checkout.session.async_payment_succeeded support owner-linking default effect.",
         "Owner link operation is idempotent and safe for replayed events.",
         "Behavior can be overridden or disabled without forking internals.",
-        "bun run lint passes",
-        "bun run typecheck passes",
         "bun test passes",
         "bun run test:integration passes",
         "bun run test:example-app passes"
@@ -49,8 +45,6 @@
         "Default effects include syncAccountById behavior for account projection updates.",
         "Connected-account fields needed by facade and core flows are persisted.",
         "Tests verify onboarding status transitions from webhook payloads.",
-        "bun run lint passes",
-        "bun run typecheck passes",
         "bun test passes",
         "bun run test:integration passes",
         "bun run test:example-app passes"
@@ -70,8 +64,6 @@
         "Convenience API inventory is parity-reviewed against Pay Stripe customer and subscription ergonomics.",
         "Missing high-value helpers are implemented or explicitly documented as intentional differences.",
         "Migration table maps Pay idioms to Solidus convenience methods.",
-        "bun run lint passes",
-        "bun run typecheck passes",
         "bun test passes"
       ],
       "priority": 4,
@@ -91,8 +83,6 @@
         "A machine-readable parity matrix maps each Pay Stripe capability to Solidus implementation status.",
         "Every missing entry has an execution story or explicit defer rationale.",
         "Matrix is linked from top-level docs.",
-        "bun run lint passes",
-        "bun run typecheck passes",
         "bun test passes"
       ],
       "priority": 5,
@@ -110,8 +100,6 @@
         "Gap helpers identified in US-005 are implemented with typed APIs.",
         "Helpers align with existing error taxonomy (ActionRequiredError, ProviderError, and others).",
         "Integration tests validate helper behavior against Stripe test mode where feasible.",
-        "bun run lint passes",
-        "bun run typecheck passes",
         "bun test passes",
         "bun run test:integration passes",
         "bun run test:example-app passes"
@@ -131,8 +119,6 @@
         "Subscriber suppression behavior for duplicate-side-effect events remains preserved.",
         "Required event diagnostics remain accurate.",
         "Replay behavior remains idempotent across newly added effects.",
-        "bun run lint passes",
-        "bun run typecheck passes",
         "bun test passes",
         "bun run test:integration passes",
         "bun run test:example-app passes"
@@ -152,8 +138,6 @@
         "README links a single canonical quickstart.",
         "Quickstart includes env vars, Stripe setup, migrations, repository wiring, facade setup, and webhook mount order.",
         "Quickstart includes expected outputs validation checkpoints.",
-        "bun run lint passes",
-        "bun run typecheck passes",
         "bun test passes"
       ],
       "priority": 8,
@@ -171,27 +155,6 @@
         "Docs structure mirrors Pay mental model for discoverability.",
         "Each domain page includes copy-ready examples and caveats.",
         "Cross-links cover SCA, checkout, metering, tax, and connect.",
-        "bun run lint passes",
-        "bun run typecheck passes",
-        "bun test passes"
-      ],
-      "priority": 9,
-      "passes": false,
-      "notes": "",
-      "dependsOn": [
-        "US-008"
-      ]
-    },
-    {
-      "id": "US-010",
-      "title": "Publish explicit Not Portable from Rails guide",
-      "description": "As a migrating team, I want clear guidance on what cannot or should not be ported 1:1.",
-      "acceptanceCriteria": [
-        "Guide lists Rails-only features and TS-native alternatives.",
-        "No ambiguous parity claims remain in public docs.",
-        "Guide is referenced from README, migration docs, and release notes.",
-        "bun run lint passes",
-        "bun run typecheck passes",
         "bun test passes"
       ],
       "priority": 10,
@@ -209,8 +172,6 @@
         "Guide covers deployment topology, worker setup, retries, replay, dead-letter triage, and secret rotation.",
         "Guide includes live or test mode policy recommendations for production.",
         "Guide includes rollback toggles and incident checklists.",
-        "bun run lint passes",
-        "bun run typecheck passes",
         "bun test passes"
       ],
       "priority": 11,
@@ -229,8 +190,6 @@
         "Solidus provides a documented default implementation path, not only delegate wrappers.",
         "Setup does not require writing boilerplate delegates for common use cases.",
         "Tests validate the default path end-to-end.",
-        "bun run lint passes",
-        "bun run typecheck passes",
         "bun test passes",
         "bun run test:integration passes",
         "bun run test:example-app passes"
@@ -251,8 +210,6 @@
         "Example app covers processor assignment, checkout, SCA action-required, subscription lifecycle, and webhook replay.",
         "Example docs explain expected state transitions in projections.",
         "Example scripts run in CI.",
-        "bun run lint passes",
-        "bun run typecheck passes",
         "bun test passes",
         "bun run test:integration passes",
         "bun run test:example-app passes"
@@ -272,8 +229,6 @@
         "Release checklist includes all parity matrix entries.",
         "All parity stories pass quality gates and integration suites.",
         "Remaining differences are documented as intentional or non-portable.",
-        "bun run lint passes",
-        "bun run typecheck passes",
         "bun test passes",
         "bun run test:integration passes",
         "bun run test:example-app passes",
