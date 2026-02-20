@@ -1,0 +1,116 @@
+[
+  {
+    "id": "evt_charge_succeeded",
+    "type": "charge.succeeded",
+    "data": { "object": { "id": "ch_1" } }
+  },
+  {
+    "id": "evt_charge_refunded",
+    "type": "charge.refunded",
+    "data": { "object": { "id": "ch_1" } }
+  },
+  {
+    "id": "evt_charge_updated",
+    "type": "charge.updated",
+    "data": { "object": { "id": "ch_1" } }
+  },
+  {
+    "id": "evt_pi_succeeded",
+    "type": "payment_intent.succeeded",
+    "data": { "object": { "id": "pi_1" } }
+  },
+  {
+    "id": "evt_invoice_upcoming",
+    "type": "invoice.upcoming",
+    "data": { "object": { "id": "in_1" } }
+  },
+  {
+    "id": "evt_invoice_action_required",
+    "type": "invoice.payment_action_required",
+    "data": { "object": { "id": "in_2", "payment_intent": "pi_2" } }
+  },
+  {
+    "id": "evt_invoice_failed",
+    "type": "invoice.payment_failed",
+    "data": { "object": { "id": "in_3" } }
+  },
+  {
+    "id": "evt_sub_created",
+    "type": "customer.subscription.created",
+    "data": { "object": { "id": "sub_1" } }
+  },
+  {
+    "id": "evt_sub_updated",
+    "type": "customer.subscription.updated",
+    "data": { "object": { "id": "sub_1" } }
+  },
+  {
+    "id": "evt_sub_deleted",
+    "type": "customer.subscription.deleted",
+    "data": { "object": { "id": "sub_1" } }
+  },
+  {
+    "id": "evt_sub_trial",
+    "type": "customer.subscription.trial_will_end",
+    "data": { "object": { "id": "sub_1" } }
+  },
+  {
+    "id": "evt_customer_updated",
+    "type": "customer.updated",
+    "data": { "object": { "id": "cus_1" } }
+  },
+  {
+    "id": "evt_customer_deleted",
+    "type": "customer.deleted",
+    "data": { "object": { "id": "cus_2" } }
+  },
+  {
+    "id": "evt_pm_attached",
+    "type": "payment_method.attached",
+    "data": { "object": { "id": "pm_1" } }
+  },
+  {
+    "id": "evt_pm_updated",
+    "type": "payment_method.updated",
+    "data": { "object": { "id": "pm_1" } }
+  },
+  {
+    "id": "evt_pm_auto",
+    "type": "payment_method.card_automatically_updated",
+    "data": { "object": { "id": "pm_1" } }
+  },
+  {
+    "id": "evt_pm_detached",
+    "type": "payment_method.detached",
+    "data": { "object": { "id": "pm_1" } }
+  },
+  {
+    "id": "evt_account_updated",
+    "type": "account.updated",
+    "data": { "object": { "id": "acct_1" } }
+  },
+  {
+    "id": "evt_checkout_completed",
+    "type": "checkout.session.completed",
+    "data": {
+      "object": {
+        "id": "cs_1",
+        "client_reference_id": "User_1",
+        "customer": "cus_1",
+        "payment_intent": "pi_3",
+        "subscription": "sub_1"
+      }
+    }
+  },
+  {
+    "id": "evt_checkout_async",
+    "type": "checkout.session.async_payment_succeeded",
+    "data": {
+      "object": {
+        "id": "cs_2",
+        "payment_intent": "pi_4",
+        "subscription": "sub_2"
+      }
+    }
+  }
+]

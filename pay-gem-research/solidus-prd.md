@@ -177,25 +177,25 @@ Security/reliability gates:
     - [x] Verification: Integration tests for lifecycle transitions and SCA-required transitions.
     - [x] Definition of Done: State machine table documented.
 
-- [ ] **Milestone M3: Webhooks and Async Processing**
-  - [ ] **Task M3-T1: Express webhook adapter**
-    - [ ] Implement router factory + route-local raw body middleware.
-    - [ ] Verify signature with multiple webhook secrets support.
-    - [ ] Add clear startup/runtime diagnostics for misconfiguration.
-    - [ ] Verification: Tests for valid/invalid signatures, missing headers, wrong secret, parsed body failure.
-    - [ ] Definition of Done: Ready-to-copy Express setup docs published.
-  - [ ] **Task M3-T2: Persist-first webhook pipeline + queue adapter**
-    - [ ] Persist incoming events with idempotency keys.
-    - [ ] Implement `inline` and `db-outbox` processing adapters.
-    - [ ] Add retry and dead-letter behavior.
-    - [ ] Verification: Tests for duplicate events, transient handler errors, retry/backoff behavior.
-    - [ ] Definition of Done: Operational runbook for stuck/retrying webhooks published.
-  - [ ] **Task M3-T3: Stripe event handler parity implementation**
-    - [ ] Implement handlers for all events listed in `pay-gem-research/stripe-webhook-map.md`.
-    - [ ] Implement custom subscriber API (subscribe/unsubscribe/all).
-    - [ ] Ensure no duplicate notifications/side effects where Pay suppresses them.
-    - [ ] Verification: Event-by-event integration tests with fixture payloads.
-    - [ ] Definition of Done: Coverage matrix shows all mapped events implemented.
+- [x] **Milestone M3: Webhooks and Async Processing**
+  - [x] **Task M3-T1: Express webhook adapter**
+    - [x] Implement router factory + route-local raw body middleware.
+    - [x] Verify signature with multiple webhook secrets support.
+    - [x] Add clear startup/runtime diagnostics for misconfiguration.
+    - [x] Verification: Tests for valid/invalid signatures, missing headers, wrong secret, parsed body failure.
+    - [x] Definition of Done: Ready-to-copy Express setup docs published.
+  - [x] **Task M3-T2: Persist-first webhook pipeline + queue adapter**
+    - [x] Persist incoming events with idempotency keys.
+    - [x] Implement `inline` and `db-outbox` processing adapters.
+    - [x] Add retry and dead-letter behavior.
+    - [x] Verification: Tests for duplicate events, transient handler errors, retry/backoff behavior.
+    - [x] Definition of Done: Operational runbook for stuck/retrying webhooks published.
+  - [x] **Task M3-T3: Stripe event handler parity implementation**
+    - [x] Implement handlers for all events listed in `pay-gem-research/stripe-webhook-map.md`.
+    - [x] Implement custom subscriber API (subscribe/unsubscribe/all).
+    - [x] Ensure no duplicate notifications/side effects where Pay suppresses them.
+    - [x] Verification: Event-by-event integration tests with fixture payloads.
+    - [x] Definition of Done: Coverage matrix shows all mapped events implemented.
 
 - [ ] **Milestone M4: Checkout, SCA, Metered Billing, Tax, Connect**
   - [ ] **Task M4-T1: Checkout and Billing Portal APIs**
