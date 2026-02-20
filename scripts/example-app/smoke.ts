@@ -8,6 +8,8 @@ import {
   type IdempotencyRepository,
   type PersistedWebhookEvent,
   type QueueJob,
+  type StripeCustomerProjection,
+  type StripeCustomerProjectionRepository,
   type WebhookEventRepository,
 } from "../../index.ts";
 
@@ -130,14 +132,49 @@ class InMemoryOutbox implements DbOutboxRepository {
   }
 }
 
+class InMemoryCustomerProjectionRepository implements StripeCustomerProjectionRepository {
+  private readonly customers = new Map<string, StripeCustomerProjection>();
+
+  async upsert(customer: StripeCustomerProjection): Promise<void> {
+    this.customers.set(customer.processorId, customer);
+  }
+
+  has(processorId: string): boolean {
+    return this.customers.has(processorId);
+  }
+}
+
 function assert(condition: unknown, message: string): void {
   if (!condition) {
     throw new Error(message);
   }
 }
 
-const stripe = {} as Stripe;
-const facade = createSolidusFacade({ stripe });
+const customerProjectionRepository = new InMemoryCustomerProjectionRepository();
+let seenStripeAccount: string | undefined;
+const stripe = {
+  customers: {
+    retrieve: async (customerId: string, requestOptions?: Stripe.RequestOptions) => {
+      seenStripeAccount = requestOptions?.stripeAccount;
+      return {
+        id: customerId,
+        object: "customer",
+        email: "smoke@example.com",
+        metadata: {},
+        invoice_settings: {},
+      } as Stripe.Customer;
+    },
+  },
+} as unknown as Stripe;
+const facade = createSolidusFacade({
+  stripe,
+  repositories: {
+    customers: customerProjectionRepository,
+  },
+  webhookRegistration: {
+    enableDefaultEffects: true,
+  },
+});
 
 const idempotencyRepository = new InMemoryIdempotencyRepository();
 const eventRepository = new InMemoryWebhookRepository();
@@ -156,15 +193,16 @@ const pipeline = createPersistFirstWebhookPipeline({
 const enqueueResult = await pipeline.ingest({
   processor: "stripe",
   eventId: "evt_example_1",
-  eventType: "charge.succeeded",
+  eventType: "customer.updated",
   payload: {
     id: "evt_example_1",
-    type: "charge.succeeded",
+    type: "customer.updated",
     data: {
       object: {
-        id: "ch_1",
+        id: "cus_1",
       },
     },
+    account: "acct_smoke",
   },
 });
 
@@ -177,4 +215,6 @@ const persisted = await eventRepository.findByEventId({
 });
 
 assert(persisted?.processedAt instanceof Date, "Example webhook should be processed.");
+assert(customerProjectionRepository.has("cus_1"), "Default customer sync should write customer projection.");
+assert(seenStripeAccount === "acct_smoke", "Connected account context should flow into default effects.");
 console.log("Example app workflow smoke checks passed.");

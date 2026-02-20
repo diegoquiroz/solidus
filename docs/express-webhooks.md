@@ -9,24 +9,27 @@ import express from "express";
 import Stripe from "stripe";
 import {
   createDbOutboxQueueAdapter,
-  getWebhookHealthDiagnostics,
   createPersistFirstWebhookPipeline,
-  createStripeWebhookHandlers,
-  createStripeWebhookProcessor,
+  createSolidusFacade,
   createStripeWebhookRouter,
+  getWebhookHealthDiagnostics,
 } from "@diegoquiroz/solidus";
 
 const app = express();
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {});
 
-const processor = createStripeWebhookProcessor({
-  handlers: createStripeWebhookHandlers({
+const facade = createSolidusFacade({
+  stripe,
+  repositories,
+  webhookRepositories,
+  webhookRegistration: {
+    enableDefaultEffects: true,
     effects: {
-      async syncChargeById(chargeId) {
-        // sync local projection
+      async notifySubscriptionTrialWillEnd(subscriptionId) {
+        console.log("trial ending", subscriptionId);
       },
     },
-  }),
+  },
 });
 
 const pipeline = createPersistFirstWebhookPipeline({
@@ -34,7 +37,7 @@ const pipeline = createPersistFirstWebhookPipeline({
   eventRepository,
   queue: createDbOutboxQueueAdapter({ outbox: outboxRepository }),
   processEvent: async (event) => {
-    await processor.process(event.payload as Stripe.Event);
+    await facade.webhooks.process(event.payload as Stripe.Event);
   },
   observability: {
     log(entry) {

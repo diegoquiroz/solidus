@@ -13,6 +13,7 @@ import { mapStripeError } from "./errors.ts";
 export interface StripeCustomerProjection {
   processor: "stripe";
   processorId: string;
+  connectedAccountId?: string;
   email?: string;
   metadata?: Record<string, string>;
   rawPayload: Stripe.Customer;
@@ -20,6 +21,7 @@ export interface StripeCustomerProjection {
 
 export interface StripeCustomerProjectionRepository {
   upsert(customer: StripeCustomerProjection): Promise<void>;
+  findByProcessorId?(processorId: string): Promise<StripeCustomerProjection | null>;
 }
 
 export interface StripeCoreRepositories {
@@ -422,9 +424,12 @@ export function createStripeCoreApi(options: StripeCoreApiOptions) {
       }
     },
 
-    async retrieve(customerId: string): Promise<Stripe.Customer> {
+    async retrieve(
+      customerId: string,
+      requestOptions?: Stripe.RequestOptions,
+    ): Promise<Stripe.Customer> {
       try {
-        return await options.stripe.customers.retrieve(customerId) as Stripe.Customer;
+        return await options.stripe.customers.retrieve(customerId, requestOptions) as Stripe.Customer;
       } catch (error: unknown) {
         throw mapStripeError(error, "customers.retrieve");
       }
@@ -471,8 +476,11 @@ export function createStripeCoreApi(options: StripeCoreApiOptions) {
       }
     },
 
-    async reconcileByProcessorId(customerId: string): Promise<Stripe.Customer> {
-      return customers.retrieve(customerId);
+    async reconcileByProcessorId(
+      customerId: string,
+      requestOptions?: Stripe.RequestOptions,
+    ): Promise<Stripe.Customer> {
+      return customers.retrieve(customerId, requestOptions);
     },
   };
 
