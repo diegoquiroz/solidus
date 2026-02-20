@@ -57,6 +57,16 @@ app.use(
     webhookSecrets: [process.env.STRIPE_WEBHOOK_SECRET!],
     pipeline,
     routePath: "/webhooks/stripe",
+    eventModePolicy: {
+      // Defaults are true for both flags.
+      allowLiveEvents: true,
+      allowTestEvents: process.env.NODE_ENV !== "production",
+    },
+    observability: {
+      log(entry) {
+        console.warn("stripe webhook rejected", entry);
+      },
+    },
   }),
 );
 
@@ -84,6 +94,26 @@ if (diagnostics.warnings.length > 0) {
 - Empty webhook secret config returns `400` with `CONFIGURATION_ERROR`.
 - Parsed body (non-raw payload) returns `400` with a route-ordering hint.
 - Multiple secrets are supported for zero-downtime secret rotation.
+
+## Event mode policy (live/test)
+
+- By default, both `allowLiveEvents` and `allowTestEvents` are `true` for backward compatibility.
+- Set `eventModePolicy.allowTestEvents: false` to reject Stripe test events (`livemode: false`) on production endpoints.
+- Rejected events return `400` with `WEBHOOK_EVENT_REJECTED` and body details:
+
+```json
+{
+  "received": false,
+  "error": "WEBHOOK_EVENT_REJECTED",
+  "message": "Stripe webhook event rejected by configured livemode policy.",
+  "details": {
+    "reason": "test_events_disabled",
+    "livemode": false
+  }
+}
+```
+
+- Rejections emit `observability.log` entries with `event: "stripe.webhook.rejected"`.
 
 ## Observability and operations
 

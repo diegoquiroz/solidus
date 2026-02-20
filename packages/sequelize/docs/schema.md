@@ -117,7 +117,7 @@ erDiagram
 
 - `customers.metadata` preserves `CustomerRecord.metadata` as JSONB.
 - `payment_methods.customer_processor_id`, `payment_methods.exp_month`, `payment_methods.exp_year`, and `payment_methods.raw_payload` map to `PaymentMethodRecord`.
-- `charges.customer_processor_id`, `charges.receipt_url`, `charges.tax_amount`, `charges.total_tax_amounts`, `charges.refund_total`, `charges.payment_method_snapshot`, and `charges.raw_payload` map to `ChargeRecord`.
+- `charges.customer_processor_id`, `charges.receipt_url`, `charges.tax_amount`, `charges.total_tax_amounts`, `charges.refund_total`, `charges.payment_method_snapshot`, and `charges.raw_payload` map to `ChargeRecord` (`tax_amount` <- `payment_intent.amount_details.tax.total_tax_amount`, `total_tax_amounts` <- `payment_intent.amount_details.line_items[].tax.total_tax_amount`).
 - `subscriptions.customer_processor_id`, `subscriptions.price_id`, `subscriptions.cancel_at_period_end`, `subscriptions.current_period_start`, `subscriptions.trial_ends_at`, `subscriptions.paused_behavior`, `subscriptions.paused_resumes_at`, and `subscriptions.raw_payload` map to `SubscriptionRecord`.
 - `invoices` stores invoice projections with unique `(processor, processor_id)` plus customer/subscription lookup indexes for predictable reads.
 - `webhooks.attempt_count`, `webhooks.next_attempt_at`, `webhooks.last_error`, and `webhooks.dead_lettered_at` support webhook lifecycle transitions.

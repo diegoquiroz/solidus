@@ -171,6 +171,46 @@ function createFakeStripe(): Stripe {
     customer: "cus_1",
     amount: 1250,
     currency: "usd",
+    amount_details: {
+      tax: {
+        total_tax_amount: 150,
+      },
+      line_items: {
+        object: "list",
+        data: [
+          {
+            id: "li_1",
+            object: "payment_intent_amount_details_line_item",
+            discount_amount: null,
+            payment_method_options: null,
+            product_code: null,
+            product_name: "Base",
+            quantity: 1,
+            tax: {
+              total_tax_amount: 100,
+            },
+            unit_cost: 1000,
+            unit_of_measure: null,
+          },
+          {
+            id: "li_2",
+            object: "payment_intent_amount_details_line_item",
+            discount_amount: null,
+            payment_method_options: null,
+            product_code: null,
+            product_name: "Addon",
+            quantity: 1,
+            tax: {
+              total_tax_amount: 50,
+            },
+            unit_cost: 250,
+            unit_of_measure: null,
+          },
+        ],
+        has_more: false,
+        url: "/v1/payment_intents/pi_1/amount_details_line_items",
+      },
+    },
     status: "succeeded",
     latest_charge: "ch_1",
   } as Stripe.PaymentIntent);
@@ -270,6 +310,8 @@ describe("stripe default webhook effects", () => {
     expect(customerRepo.values.get("cus_1")?.processorId).toBe("cus_1");
     expect(paymentMethodRepo.values.get("pm_1")?.isDefault).toBe(true);
     expect(chargeRepo.values.get("ch_1")?.refundTotal).toBe(250);
+    expect(chargeRepo.values.get("ch_1")?.taxAmount).toBe(150);
+    expect(chargeRepo.values.get("ch_1")?.totalTaxAmounts).toEqual([100, 50]);
     expect(invoiceRepo.values.get("in_1")?.status).toBe("open");
     expect(subscriptionRepo.values.get("sub_1")?.priceId).toBe("price_1");
   });

@@ -209,7 +209,7 @@ export interface StripeSubscriptionQuantityInput {
 
 export interface StripePauseSubscriptionInput {
   subscriptionId: string;
-  behavior: "void" | "keep_as_draft" | "mark_uncollectible";
+  behavior?: "void" | "keep_as_draft" | "mark_uncollectible";
   resumesAt?: Date;
 }
 
@@ -332,6 +332,12 @@ function toChargeRecord(
     });
   }
 
+  const taxAmount = paymentIntent.amount_details?.tax?.total_tax_amount ?? undefined;
+  const lineItems = paymentIntent.amount_details?.line_items;
+  const lineItemTaxAmounts = (Array.isArray(lineItems) ? lineItems : lineItems?.data)
+    ?.map((lineItem) => lineItem.tax?.total_tax_amount)
+    .filter((value): value is number => typeof value === "number");
+
   return {
     id: `stripe_charge_${charge?.id ?? paymentIntent.id}`,
     processor: "stripe",
@@ -341,8 +347,8 @@ function toChargeRecord(
     currency: paymentIntent.currency,
     status: paymentIntent.status,
     receiptUrl: charge?.receipt_url ?? undefined,
-    taxAmount: charge?.amount_captured !== undefined ? charge.amount_refunded : undefined,
-    totalTaxAmounts: charge?.balance_transaction ?? undefined,
+    taxAmount,
+    totalTaxAmounts: lineItemTaxAmounts && lineItemTaxAmounts.length > 0 ? lineItemTaxAmounts : undefined,
     refundTotal: charge?.amount_refunded,
     paymentMethodSnapshot: getPaymentMethodSnapshot(paymentIntent, charge),
     rawPayload: {
@@ -794,7 +800,7 @@ export function createStripeCoreApi(options: StripeCoreApiOptions) {
         input.subscriptionId,
         {
           pause_collection: {
-            behavior: input.behavior,
+            behavior: input.behavior ?? "void",
             resumes_at:
               input.resumesAt === undefined ? undefined : Math.floor(input.resumesAt.getTime() / 1000),
           },
@@ -1060,10 +1066,6 @@ export function createStripeCoreApi(options: StripeCoreApiOptions) {
     },
 
     active(subscription: SubscriptionRecord, now = new Date()): boolean {
-      if (state.paused(subscription)) {
-        return false;
-      }
-
       if (state.onTrial(subscription, now)) {
         return true;
       }

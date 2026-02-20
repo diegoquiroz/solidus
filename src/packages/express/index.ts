@@ -64,6 +64,81 @@ export interface StripeWebhookConfigurationDiagnostics {
   readonly warnings: readonly string[];
 }
 
+export interface StripeWebhookEventModePolicy {
+  readonly allowLiveEvents?: boolean;
+  readonly allowTestEvents?: boolean;
+}
+
+export interface StripeWebhookHandlerLogEntry {
+  readonly level: "warn";
+  readonly event: "stripe.webhook.rejected";
+  readonly message: string;
+  readonly processor: "stripe";
+  readonly eventId: string;
+  readonly eventType: string;
+  readonly livemode: boolean;
+  readonly reason: "live_events_disabled" | "test_events_disabled";
+  readonly timestamp: Date;
+}
+
+export interface StripeWebhookHandlerObservability {
+  readonly log?: (entry: StripeWebhookHandlerLogEntry) => void | Promise<void>;
+}
+
+interface NormalizedStripeWebhookEventModePolicy {
+  readonly allowLiveEvents: boolean;
+  readonly allowTestEvents: boolean;
+}
+
+function normalizeStripeWebhookEventModePolicy(
+  policy: StripeWebhookEventModePolicy | undefined,
+): NormalizedStripeWebhookEventModePolicy {
+  return {
+    allowLiveEvents: policy?.allowLiveEvents ?? true,
+    allowTestEvents: policy?.allowTestEvents ?? true,
+  };
+}
+
+async function emitHandlerLog(
+  observability: StripeWebhookHandlerObservability | undefined,
+  entry: StripeWebhookHandlerLogEntry,
+): Promise<void> {
+  if (observability?.log === undefined) {
+    return;
+  }
+
+  try {
+    await observability.log(entry);
+  } catch {
+    // Swallow observability hook failures to preserve webhook behavior.
+  }
+}
+
+function isEventAllowedByModePolicy(
+  event: Stripe.Event,
+  policy: NormalizedStripeWebhookEventModePolicy,
+): { allowed: true } | { allowed: false; reason: "live_events_disabled" | "test_events_disabled" } {
+  if (event.livemode) {
+    if (policy.allowLiveEvents) {
+      return { allowed: true };
+    }
+
+    return {
+      allowed: false,
+      reason: "live_events_disabled",
+    };
+  }
+
+  if (policy.allowTestEvents) {
+    return { allowed: true };
+  }
+
+  return {
+    allowed: false,
+    reason: "test_events_disabled",
+  };
+}
+
 export function diagnoseStripeWebhookConfiguration(input: {
   webhookSecrets: readonly string[];
   configuredEvents?: readonly string[];
@@ -105,8 +180,11 @@ export function createStripeWebhookHandler(input: {
   webhookSecrets: readonly string[];
   pipeline: WebhookPipeline;
   now?: () => Date;
+  eventModePolicy?: StripeWebhookEventModePolicy;
+  observability?: StripeWebhookHandlerObservability;
 }): ExpressLikeHandler {
   const now = input.now ?? (() => new Date());
+  const eventModePolicy = normalizeStripeWebhookEventModePolicy(input.eventModePolicy);
 
   return async (request, response, next) => {
     try {
@@ -128,6 +206,34 @@ export function createStripeWebhookHandler(input: {
         signatureHeader,
         webhookSecrets: input.webhookSecrets,
       });
+
+      const modePolicyCheck = isEventAllowedByModePolicy(event, eventModePolicy);
+
+      if (!modePolicyCheck.allowed) {
+        const timestamp = now();
+        await emitHandlerLog(input.observability, {
+          level: "warn",
+          event: "stripe.webhook.rejected",
+          message: "Stripe webhook event rejected by configured livemode policy.",
+          processor: "stripe",
+          eventId: event.id,
+          eventType: event.type,
+          livemode: event.livemode,
+          reason: modePolicyCheck.reason,
+          timestamp,
+        });
+
+        response.status(400).json({
+          received: false,
+          error: "WEBHOOK_EVENT_REJECTED",
+          message: "Stripe webhook event rejected by configured livemode policy.",
+          details: {
+            reason: modePolicyCheck.reason,
+            livemode: event.livemode,
+          },
+        });
+        return;
+      }
 
       const result = await input.pipeline.ingest({
         processor: "stripe",
@@ -162,6 +268,8 @@ export function createStripeWebhookRouter(input: {
   webhookSecrets: readonly string[];
   pipeline: WebhookPipeline;
   routePath?: string;
+  eventModePolicy?: StripeWebhookEventModePolicy;
+  observability?: StripeWebhookHandlerObservability;
 }): ExpressLikeRouter {
   const router = input.express.Router();
   const routePath = input.routePath ?? "/webhooks/stripe";
@@ -171,6 +279,8 @@ export function createStripeWebhookRouter(input: {
     stripe: input.stripe,
     webhookSecrets: input.webhookSecrets,
     pipeline: input.pipeline,
+    eventModePolicy: input.eventModePolicy,
+    observability: input.observability,
   });
 
   router.post(routePath, rawBodyMiddleware, compatibilityMiddleware, handler);

@@ -266,6 +266,12 @@ function toChargeRecord(input: {
     return null;
   }
 
+  const taxAmount = input.paymentIntent?.amount_details?.tax?.total_tax_amount ?? undefined;
+  const lineItems = input.paymentIntent?.amount_details?.line_items;
+  const lineItemTaxAmounts = (Array.isArray(lineItems) ? lineItems : lineItems?.data)
+    ?.map((lineItem) => lineItem.tax?.total_tax_amount)
+    .filter((value): value is number => typeof value === "number");
+
   return {
     id: `stripe_charge_${input.charge.id}`,
     processor: "stripe",
@@ -275,8 +281,8 @@ function toChargeRecord(input: {
     currency: input.charge.currency,
     status: input.paymentIntent?.status ?? input.charge.status ?? "unknown",
     receiptUrl: input.charge.receipt_url ?? undefined,
-    taxAmount: input.charge.amount_refunded,
-    totalTaxAmounts: input.charge.balance_transaction ?? undefined,
+    taxAmount,
+    totalTaxAmounts: lineItemTaxAmounts && lineItemTaxAmounts.length > 0 ? lineItemTaxAmounts : undefined,
     refundTotal: input.charge.amount_refunded,
     paymentMethodSnapshot: input.charge.payment_method_details ?? undefined,
     rawPayload: {

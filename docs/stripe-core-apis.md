@@ -99,6 +99,7 @@ app.post("/payments/charge", async (req, res, next) => {
 - Send usage with `api.meters.createEvent({ eventName, payload })` using Stripe meter names and customer IDs in payload.
 - Keep meter event identifiers deterministic when retrying to avoid duplicate usage writes.
 - Pass tax settings through Stripe options where supported (`checkout` helper `stripeOptions.automatic_tax`, `subscriptions.create(...stripeOptions)`).
+- Charge normalization tax semantics: `taxAmount` maps from `payment_intent.amount_details.tax.total_tax_amount`; `totalTaxAmounts` maps from `payment_intent.amount_details.line_items[].tax.total_tax_amount`.
 - Reconcile usage and invoice totals from webhook events before finalizing access changes.
 
 ### Usage records to meters migration note
@@ -120,7 +121,7 @@ app.post("/payments/charge", async (req, res, next) => {
 | `active` | yes | yes | no | no | no |
 | `trialing` | yes | yes | yes | no | no |
 | `active` + `cancelAtPeriodEnd=true` + future period end | yes | yes | no | yes | no |
-| any status + `pause_collection` set | yes | no | no | no | yes |
+| any status + `pause_collection` set | yes | yes | no | no | yes |
 | `canceled` / `incomplete_expired` / `unpaid` | no | no | no | no | no |
 
 Helpers are exposed under `api.state`:
@@ -131,3 +132,7 @@ Helpers are exposed under `api.state`:
 - `onGracePeriod(subscription)`
 - `paused(subscription)`
 - `billingPeriod(subscription)`
+
+Paused parity semantics: a paused subscription remains `active` while `pause_collection` is present, unless the Stripe status is terminal (`canceled`, `incomplete_expired`, or `unpaid`).
+
+Pause API default: `api.subscriptions.pause({ subscriptionId })` defaults Stripe `pause_collection.behavior` to `"void"` when omitted. Pass `behavior` explicitly to use `"keep_as_draft"` or `"mark_uncollectible"`.

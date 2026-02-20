@@ -14,8 +14,8 @@
         "bun test src/packages/stripe/__tests__ --test-name-pattern \"paused\" passes"
       ],
       "priority": 1,
-      "passes": false,
-      "notes": "",
+      "passes": true,
+      "notes": "Updated paused active-state semantics in stripe state derivation, added paused lifecycle and cancellation interaction tests, and documented parity behavior. Verified with: bun test src/packages/stripe/__tests__ --test-name-pattern \"paused\" (2 pass, 0 fail).",
       "dependsOn": []
     },
     {
@@ -29,8 +29,8 @@
         "bun test src/packages/stripe/__tests__ --test-name-pattern \"pause\" passes"
       ],
       "priority": 2,
-      "passes": false,
-      "notes": "",
+      "passes": true,
+      "notes": "Made pause behavior optional with default \"void\", preserved explicit behavior handling, added payload tests for default and explicit paths, and documented the default. Verified with: bun test src/packages/stripe/__tests__ --test-name-pattern \"pause\" (4 pass, 0 fail).",
       "dependsOn": [
         "US-001"
       ]
@@ -46,8 +46,8 @@
         "bun test src/packages/express/__tests__ --test-name-pattern \"test events\" passes"
       ],
       "priority": 3,
-      "passes": false,
-      "notes": "",
+      "passes": true,
+      "notes": "Added configurable event mode policy flags to express webhook adapter with backward-compatible defaults (allow live+test), documented behavior, and implemented rejection logging plus 400 responses for disallowed modes. Verified with: bun test src/packages/express/__tests__ --test-name-pattern \"test events\" (2 pass, 0 fail).",
       "dependsOn": [
         "US-002"
       ]
@@ -63,8 +63,8 @@
         "bun test src/packages/stripe/__tests__ --test-name-pattern \"tax\" passes"
       ],
       "priority": 4,
-      "passes": false,
-      "notes": "",
+      "passes": true,
+      "notes": "Corrected charge tax mapping to Stripe payment_intent amount_details tax fields (including line-item totals), added no-tax/single-tax/multiple-tax test coverage, and updated tax semantics docs/examples. Verified with: bun test src/packages/stripe/__tests__ --test-name-pattern \"tax\" (3 pass, 0 fail).",
       "dependsOn": [
         "US-003"
       ]

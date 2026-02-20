@@ -116,6 +116,7 @@ function createFakeStripe(): Stripe {
   const accounts = new Map<string, Stripe.Account>();
 
   let lastSubscriptionCreateParams: Stripe.SubscriptionCreateParams | undefined;
+  let lastSubscriptionUpdateParams: Stripe.SubscriptionUpdateParams | undefined;
   let lastCheckoutCreateParams: Stripe.Checkout.SessionCreateParams | undefined;
   let lastBillingPortalCreateParams: Stripe.BillingPortal.SessionCreateParams | undefined;
   let lastMeterEventParams: Record<string, unknown> | undefined;
@@ -258,6 +259,7 @@ function createFakeStripe(): Stripe {
       customer: params.customer as string,
       amount: params.amount,
       currency: params.currency,
+      amount_details: params.amount_details as Stripe.PaymentIntent.AmountDetails | undefined,
       status: params.capture_method === "manual" ? "requires_capture" : "succeeded",
       latest_charge: chargeId,
       payment_method: params.payment_method,
@@ -365,6 +367,8 @@ function createFakeStripe(): Stripe {
     id: string,
     params: Stripe.SubscriptionUpdateParams,
   ): Promise<Stripe.Subscription> => {
+    lastSubscriptionUpdateParams = params;
+
     const subscription = await retrieveSubscription(id);
     subscription.cancel_at_period_end = params.cancel_at_period_end ?? subscription.cancel_at_period_end;
 
@@ -585,6 +589,7 @@ function createFakeStripe(): Stripe {
     },
     __testState: {
       getLastSubscriptionCreateParams: () => lastSubscriptionCreateParams,
+      getLastSubscriptionUpdateParams: () => lastSubscriptionUpdateParams,
       getLastCheckoutCreateParams: () => lastCheckoutCreateParams,
       getLastBillingPortalCreateParams: () => lastBillingPortalCreateParams,
       getLastMeterEventParams: () => lastMeterEventParams,
@@ -596,6 +601,7 @@ function createFakeStripe(): Stripe {
 type FakeStripeWithState = Stripe & {
   __testState: {
     getLastSubscriptionCreateParams(): Stripe.SubscriptionCreateParams | undefined;
+    getLastSubscriptionUpdateParams(): Stripe.SubscriptionUpdateParams | undefined;
     getLastCheckoutCreateParams(): Stripe.Checkout.SessionCreateParams | undefined;
     getLastBillingPortalCreateParams(): Stripe.BillingPortal.SessionCreateParams | undefined;
     getLastMeterEventParams(): Record<string, unknown> | undefined;
@@ -686,6 +692,89 @@ describe("stripe core APIs", () => {
     expect(captured.status).toBe("succeeded");
     expect(refunded.refundTotal).toBe(200);
     expect(chargeRepo.values.length).toBeGreaterThan(0);
+  });
+
+  test("normalizes charge tax fields for no-tax payloads", async () => {
+    const api = createStripeCoreApi({ stripe: createFakeStripe() });
+
+    await api.customers.create({ email: "tax-none@example.com" });
+    await api.paymentMethods.add({ customerId: "cus_1", paymentMethodId: "pm_1" });
+
+    const charge = await api.charges.charge({
+      customerId: "cus_1",
+      amount: 1200,
+      currency: "usd",
+      paymentMethodId: "pm_1",
+    });
+
+    expect(charge.taxAmount).toBeUndefined();
+    expect(charge.totalTaxAmounts).toBeUndefined();
+  });
+
+  test("normalizes charge tax fields for single-tax payloads", async () => {
+    const api = createStripeCoreApi({ stripe: createFakeStripe() });
+
+    await api.customers.create({ email: "tax-single@example.com" });
+    await api.paymentMethods.add({ customerId: "cus_1", paymentMethodId: "pm_1" });
+
+    const charge = await api.charges.charge({
+      customerId: "cus_1",
+      amount: 1200,
+      currency: "usd",
+      paymentMethodId: "pm_1",
+      stripeOptions: {
+        amount_details: {
+          tax: { total_tax_amount: 125 },
+          line_items: [
+            {
+              product_name: "Plan",
+              quantity: 1,
+              unit_cost: 1200,
+              tax: { total_tax_amount: 125 },
+            },
+          ],
+        },
+      },
+    });
+
+    expect(charge.taxAmount).toBe(125);
+    expect(charge.totalTaxAmounts).toEqual([125]);
+  });
+
+  test("normalizes charge tax fields for multiple-tax payloads", async () => {
+    const api = createStripeCoreApi({ stripe: createFakeStripe() });
+
+    await api.customers.create({ email: "tax-multi@example.com" });
+    await api.paymentMethods.add({ customerId: "cus_1", paymentMethodId: "pm_1" });
+
+    const charge = await api.charges.charge({
+      customerId: "cus_1",
+      amount: 1200,
+      currency: "usd",
+      paymentMethodId: "pm_1",
+      stripeOptions: {
+        amount_details: {
+          tax: { total_tax_amount: 200 },
+          line_items: [
+            {
+              product_name: "Item A",
+              quantity: 1,
+              unit_cost: 700,
+              tax: { total_tax_amount: 80 },
+            },
+            {
+              product_name: "Item B",
+              quantity: 1,
+              unit_cost: 500,
+              tax: { total_tax_amount: 120 },
+            },
+          ],
+        },
+      },
+    });
+
+    expect(charge.taxAmount).toBe(200);
+    expect(charge.totalTaxAmounts).toEqual([80, 120]);
   });
 
   test("wraps provider errors from stripe", async () => {
@@ -880,6 +969,95 @@ describe("stripe core APIs", () => {
     expect(retryInvoices.length).toBe(1);
     expect(subscriptionRepo.values.length).toBeGreaterThan(0);
     expect(stripe.__testState.getLastSubscriptionCreateParams()?.automatic_tax?.enabled).toBe(true);
+  });
+
+  test("keeps paused subscriptions active across cancel and resume transitions", async () => {
+    const stripe = createFakeStripe();
+    const api = createStripeCoreApi({ stripe });
+
+    await api.customers.create({ email: "paused-lifecycle@example.com" });
+    const created = await api.subscriptions.create({ customerId: "cus_1", priceId: "price_basic" });
+
+    const paused = await api.subscriptions.pause({
+      subscriptionId: created.processorId,
+      behavior: "keep_as_draft",
+    });
+
+    expect(api.state.paused(paused)).toBe(true);
+    expect(api.state.active(paused)).toBe(true);
+
+    const cancelAtPeriodEnd = await api.subscriptions.cancel(created.processorId);
+
+    expect(cancelAtPeriodEnd.cancelAtPeriodEnd).toBe(true);
+    expect(api.state.paused(cancelAtPeriodEnd)).toBe(true);
+    expect(api.state.onGracePeriod(cancelAtPeriodEnd)).toBe(true);
+    expect(api.state.active(cancelAtPeriodEnd)).toBe(true);
+
+    const resumed = await api.subscriptions.resume(created.processorId);
+    expect(resumed.cancelAtPeriodEnd).toBe(false);
+    expect(api.state.paused(resumed)).toBe(true);
+    expect(api.state.active(resumed)).toBe(true);
+
+    const unpaused = await api.subscriptions.unpause(created.processorId);
+    expect(api.state.paused(unpaused)).toBe(false);
+    expect(api.state.active(unpaused)).toBe(true);
+  });
+
+  test("treats paused subscriptions as inactive after immediate cancellation", async () => {
+    const stripe = createFakeStripe();
+    const api = createStripeCoreApi({ stripe });
+
+    await api.customers.create({ email: "paused-canceled@example.com" });
+    const created = await api.subscriptions.create({ customerId: "cus_1", priceId: "price_basic" });
+    const paused = await api.subscriptions.pause({
+      subscriptionId: created.processorId,
+      behavior: "void",
+    });
+
+    expect(api.state.active(paused)).toBe(true);
+
+    const canceledNow = await api.subscriptions.cancelNow(created.processorId);
+    expect(api.state.paused(canceledNow)).toBe(true);
+    expect(api.state.subscribed(canceledNow)).toBe(false);
+    expect(api.state.active(canceledNow)).toBe(false);
+  });
+
+  test("defaults pause behavior to void when omitted", async () => {
+    const stripe = createFakeStripe() as FakeStripeWithState;
+    const api = createStripeCoreApi({ stripe });
+
+    await api.customers.create({ email: "paused-default@example.com" });
+    const created = await api.subscriptions.create({ customerId: "cus_1", priceId: "price_basic" });
+    const paused = await api.subscriptions.pause({
+      subscriptionId: created.processorId,
+    });
+
+    expect(paused.pausedBehavior).toBe("void");
+    expect(stripe.__testState.getLastSubscriptionUpdateParams()?.pause_collection).toEqual({
+      behavior: "void",
+      resumes_at: undefined,
+    });
+  });
+
+  test("passes explicit pause behavior and resume date to Stripe", async () => {
+    const stripe = createFakeStripe() as FakeStripeWithState;
+    const api = createStripeCoreApi({ stripe });
+
+    await api.customers.create({ email: "paused-explicit@example.com" });
+    const created = await api.subscriptions.create({ customerId: "cus_1", priceId: "price_basic" });
+    const resumesAt = new Date("2026-01-01T00:00:00.000Z");
+
+    const paused = await api.subscriptions.pause({
+      subscriptionId: created.processorId,
+      behavior: "keep_as_draft",
+      resumesAt,
+    });
+
+    expect(paused.pausedBehavior).toBe("keep_as_draft");
+    expect(stripe.__testState.getLastSubscriptionUpdateParams()?.pause_collection).toEqual({
+      behavior: "keep_as_draft",
+      resumes_at: 1767225600,
+    });
   });
 
   test("throws action required when swapping item-less subscriptions", async () => {
