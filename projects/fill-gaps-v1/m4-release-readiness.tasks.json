@@ -1,0 +1,62 @@
+{
+  "name": "fill-gaps-v1-m4-release-readiness",
+  "branchName": "ralph/fill-gaps-v1-m4-release-readiness",
+  "description": "Harden operations, finalize documentation, and validate release readiness for adoption.",
+  "userStories": [
+    {
+      "id": "US-001",
+      "title": "Update webhook operations runbook and observability checklist",
+      "description": "As on-call, I want clear operational playbooks so webhook failures can be diagnosed and replayed quickly.",
+      "acceptanceCriteria": [
+        "Update docs/webhook-operations-runbook.md with replay, dead-letter triage, and common failure signatures",
+        "Document required log and metric fields for troubleshooting and verify coverage in tests where practical",
+        "Align operational guidance with latest default effects and adapter behavior",
+        "bun run typecheck passes",
+        "bun run lint passes",
+        "bun test src/packages/core/__tests__/webhooks.test.ts passes"
+      ],
+      "priority": 1,
+      "passes": false,
+      "notes": "",
+      "dependsOn": []
+    },
+    {
+      "id": "US-002",
+      "title": "Publish release notes and upgrade guidance",
+      "description": "As a maintainer, I want release guidance so adopters can migrate to the new setup with predictable steps.",
+      "acceptanceCriteria": [
+        "Update docs/release-notes-and-upgrade-guide.md with Sequelize adapter and default effects setup",
+        "Publish a parity delta table showing which Pay gaps were closed in v1",
+        "Document known limitations and compatibility notes for unresolved items",
+        "bun run typecheck passes",
+        "bun run lint passes",
+        "bun run docs:core passes"
+      ],
+      "priority": 2,
+      "passes": false,
+      "notes": "",
+      "dependsOn": [
+        "US-001"
+      ]
+    },
+    {
+      "id": "US-003",
+      "title": "Execute release candidate validation checklist",
+      "description": "As a maintainer, I want a final validation pass so we can ship with confidence.",
+      "acceptanceCriteria": [
+        "Run and record full validation suite including bun run typecheck, bun run lint, and bun test",
+        "Verify example smoke flow at scripts/example-app/smoke.ts against documented setup",
+        "Capture final sign-off checklist in project docs under projects/fill-gaps-v1",
+        "bun run typecheck passes",
+        "bun run lint passes",
+        "bun test passes"
+      ],
+      "priority": 3,
+      "passes": false,
+      "notes": "",
+      "dependsOn": [
+        "US-002"
+      ]
+    }
+  ]
+}

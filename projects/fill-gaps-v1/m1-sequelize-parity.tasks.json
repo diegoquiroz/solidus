@@ -1,0 +1,62 @@
+{
+  "name": "fill-gaps-v1-m1-sequelize-parity",
+  "branchName": "ralph/fill-gaps-v1-m1-sequelize-parity",
+  "description": "Implement first-party Sequelize repositories, align schema artifacts to core contracts, and add adapter integration tests.",
+  "userStories": [
+    {
+      "id": "US-001",
+      "title": "Implement Sequelize repositories for core contracts",
+      "description": "As an app integrator, I want first-party Sequelize repositories so that Solidus can persist and query billing projections without custom infra code.",
+      "acceptanceCriteria": [
+        "Implement concrete repositories in src/packages/sequelize covering customers, payment methods, charges, subscriptions, invoices, webhook deliveries, and idempotency records",
+        "Repositories satisfy src/packages/core/contracts.ts interfaces without any escapes",
+        "Registration path exposes a typed repository bundle for facade and webhook wiring",
+        "bun run typecheck passes",
+        "bun run lint passes",
+        "bun test src/packages/sequelize --test-name-pattern \"repository\" passes"
+      ],
+      "priority": 1,
+      "passes": true,
+      "notes": "Implemented concrete repositories and typed delegate-based bundle in src/packages/sequelize/repositories.ts and exported via src/packages/sequelize/index.ts. Added repository contract tests in src/packages/sequelize/__tests__/repository-adapters.test.ts. Verified gates: bun run typecheck, bun run lint, bun test src/packages/sequelize --test-name-pattern \"repository\" (9 pass, 0 fail).",
+      "dependsOn": []
+    },
+    {
+      "id": "US-002",
+      "title": "Align Sequelize schema and migration templates",
+      "description": "As a maintainer, I want schema parity with contract records so that runtime writes are lossless and predictable.",
+      "acceptanceCriteria": [
+        "Update packages/sequelize schema and migration templates to include required contract fields currently missing",
+        "Preserve migration naming and versioning conventions in packages/sequelize/migrations/templates",
+        "Update packages/sequelize/docs/schema.md and packages/sequelize/README.md to reflect final schema",
+        "bun run typecheck passes",
+        "bun run lint passes",
+        "bun test packages/sequelize/test --test-name-pattern \"schema\" passes"
+      ],
+      "priority": 2,
+      "passes": true,
+      "notes": "Aligned schema artifacts and migration templates with contract projection fields and webhook lifecycle requirements. Updated packages/sequelize/src/schema.ts, migration templates, docs, README, and schema artifact test coverage. Preserved template file naming/versioning. Verified gates: bun run typecheck, bun run lint, bun test packages/sequelize/test --test-name-pattern \"schema\" (3 pass, 0 fail).",
+      "dependsOn": [
+        "US-001"
+      ]
+    },
+    {
+      "id": "US-003",
+      "title": "Add adapter-level integration tests",
+      "description": "As an integrator, I want repository contract tests so that adapter behavior remains stable over upgrades.",
+      "acceptanceCriteria": [
+        "Add deterministic tests for CRUD, lookup, and idempotency conflict behavior across new repositories",
+        "Add tests for webhook persistence lifecycle including delivery, attempts, and dead-letter transitions",
+        "Ensure tests run in Bun and are scoped to sequelize adapter contracts",
+        "bun run typecheck passes",
+        "bun run lint passes",
+        "bun test src/packages/sequelize/__tests__ passes"
+      ],
+      "priority": 3,
+      "passes": true,
+      "notes": "Expanded adapter-level deterministic tests for CRUD/lookup/idempotency conflicts and webhook delivery/retry/dead-letter lifecycle in src/packages/sequelize/__tests__/repository-adapters.test.ts. Verified Bun-scoped adapter suite and gates: bun run typecheck, bun run lint, bun test src/packages/sequelize/__tests__ (10 pass, 0 fail).",
+      "dependsOn": [
+        "US-002"
+      ]
+    }
+  ]
+}

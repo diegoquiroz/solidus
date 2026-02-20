@@ -1,0 +1,100 @@
+{
+  "name": "fill-gaps-v1-m2-default-webhook-effects",
+  "branchName": "ralph/fill-gaps-v1-m2-default-webhook-effects",
+  "description": "Provide default webhook effects, turnkey sync wiring, and Pay-like integrator ergonomics for Stripe projections.",
+  "userStories": [
+    {
+      "id": "US-001",
+      "title": "Create default webhook effects module",
+      "description": "As an app integrator, I want default webhook effects so that Stripe events sync local projections without custom effect authoring.",
+      "acceptanceCriteria": [
+        "Introduce a default effects module mapping normalized webhook events to projection repository writes",
+        "Cover customer, payment method, charge or refund, invoice, and subscription projection updates",
+        "Preserve idempotent behavior for duplicate Stripe deliveries",
+        "bun run typecheck passes",
+        "bun run lint passes",
+        "bun test src/packages/stripe/__tests__ --test-name-pattern \"default effects\" passes"
+      ],
+      "priority": 1,
+      "passes": false,
+      "notes": "",
+      "dependsOn": []
+    },
+    {
+      "id": "US-002",
+      "title": "Add turnkey facade and express wiring",
+      "description": "As an app integrator, I want a simple setup path so that default sync works with minimal configuration.",
+      "acceptanceCriteria": [
+        "Add additive registration options to enable default webhook effects while preserving custom overrides",
+        "Ensure connected-account context is propagated through default effects where present",
+        "Update setup docs and scripts/example-app/smoke.ts with canonical wiring",
+        "bun run typecheck passes",
+        "bun run lint passes",
+        "bun test src/packages/facade/__tests__ src/packages/express/__tests__ passes"
+      ],
+      "priority": 2,
+      "passes": false,
+      "notes": "",
+      "dependsOn": [
+        "US-001"
+      ]
+    },
+    {
+      "id": "US-003",
+      "title": "Add end-to-end webhook sync integration tests",
+      "description": "As a maintainer, I want end-to-end sync tests so turnkey behavior stays regression-safe.",
+      "acceptanceCriteria": [
+        "Add integration tests that validate signed webhook ingress through persisted projection state",
+        "Add replay tests proving duplicate event deliveries do not duplicate side effects",
+        "Add failure and retry tests proving dead-letter captures terminal failures",
+        "bun run typecheck passes",
+        "bun run lint passes",
+        "bun test src/packages/stripe/__tests__/integration --test-name-pattern \"webhook\" passes"
+      ],
+      "priority": 3,
+      "passes": false,
+      "notes": "",
+      "dependsOn": [
+        "US-002"
+      ]
+    },
+    {
+      "id": "US-004",
+      "title": "Add owner-centric convenience APIs",
+      "description": "As an app integrator, I want Pay-like convenience methods so processor setup and sync workflows are ergonomic.",
+      "acceptanceCriteria": [
+        "Add additive facade methods for owner-centric processor setup equivalent to set payment processor behavior",
+        "Add convenience sync methods for customer and subscription reconciliation workflows",
+        "Document migration mapping from Pay idioms to Solidus convenience methods with code examples",
+        "bun run typecheck passes",
+        "bun run lint passes",
+        "bun test src/packages/facade/__tests__ --test-name-pattern \"convenience\" passes"
+      ],
+      "priority": 4,
+      "passes": false,
+      "notes": "",
+      "dependsOn": [
+        "US-002"
+      ]
+    },
+    {
+      "id": "US-005",
+      "title": "Add first-class per-customer connected-account context",
+      "description": "As a marketplace integrator, I want customer-scoped account context automatically applied so cross-account calls are correct by default.",
+      "acceptanceCriteria": [
+        "Persist and resolve per-customer connected-account context for relevant billing operations",
+        "Apply resolved account context to Stripe request options across supported facade and sync calls",
+        "Add tests that prevent account context leakage across customers and events",
+        "bun run typecheck passes",
+        "bun run lint passes",
+        "bun test src/packages/stripe/__tests__ src/packages/facade/__tests__ --test-name-pattern \"connected account\" passes"
+      ],
+      "priority": 5,
+      "passes": false,
+      "notes": "",
+      "dependsOn": [
+        "US-004"
+      ]
+    }
+  ]
+}
