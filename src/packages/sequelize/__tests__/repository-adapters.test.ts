@@ -1,10 +1,12 @@
 import { describe, expect, test } from "bun:test";
+import type Stripe from "stripe";
 import type {
   ChargeRecord,
   CustomerRecord,
   PaymentMethodRecord,
   SubscriptionRecord,
 } from "../../core/contracts.ts";
+import type { StripeAccountProjection } from "../../stripe/core-apis.ts";
 import type { PersistedWebhookEvent } from "../../core/webhooks.ts";
 import {
   createDbOutboxQueueAdapter,
@@ -12,7 +14,9 @@ import {
   drainDbOutboxQueue,
 } from "../../core/webhooks.ts";
 import {
+  createSequelizeDelegatesFromModels,
   createSequelizeRepositoryBundle,
+  createSequelizeRepositoryBundleFromModels,
   type InvoiceProjectionRecord,
   SequelizeChargeRepository,
   SequelizeCustomerRepository,
@@ -20,6 +24,7 @@ import {
   SequelizeIdempotencyRepository,
   SequelizeInvoiceProjectionRepository,
   SequelizePaymentMethodRepository,
+  SequelizeStripeAccountProjectionRepository,
   SequelizeSubscriptionRepository,
   SequelizeWebhookEventRepository,
 } from "../repositories.ts";
@@ -276,6 +281,46 @@ describe("sequelize projection repositories", () => {
     expect((await repository.findByProcessorId("in_1"))?.status).toBe("paid");
     expect((await repository.listByCustomer("cus_1")).length).toBe(1);
     expect(await repository.findByProcessorId("in_missing")).toBeNull();
+  });
+
+  test("stripe account projection repository supports upsert and lookup", async () => {
+    const rows = new Map<string, StripeAccountProjection>();
+    const repository = new SequelizeStripeAccountProjectionRepository({
+      async upsert(account) {
+        rows.set(account.processorId, account);
+      },
+      async findByProcessorId(processorId) {
+        return rows.get(processorId) ?? null;
+      },
+    });
+
+    await repository.upsert({
+      processor: "stripe",
+      processorId: "acct_1",
+      chargesEnabled: true,
+      payoutsEnabled: false,
+      detailsSubmitted: true,
+      currentlyDue: [],
+      eventuallyDue: ["external_account"],
+      pastDue: [],
+      pendingVerification: [],
+      rawPayload: {
+        id: "acct_1",
+        object: "account",
+        charges_enabled: true,
+        payouts_enabled: false,
+        details_submitted: true,
+        requirements: {
+          currently_due: [],
+          eventually_due: ["external_account"],
+          past_due: [],
+          pending_verification: [],
+        },
+      } as unknown as Stripe.Account,
+    } as StripeAccountProjection);
+
+    expect((await repository.findByProcessorId("acct_1"))?.payoutsEnabled).toBe(false);
+    expect(await repository.findByProcessorId("acct_missing")).toBeNull();
   });
 });
 
@@ -604,6 +649,205 @@ describe("sequelize webhook adapter integration", () => {
   });
 });
 
+class InMemorySequelizeModel {
+  private readonly rows: Array<Record<string, unknown>> = [];
+  private sequence = 0;
+
+  constructor(
+    private readonly uniqueConstraints: readonly (readonly string[])[] = [],
+  ) {}
+
+  async upsert(values: Record<string, unknown>): Promise<void> {
+    const index = this.findUniqueMatch(values);
+
+    if (index >= 0) {
+      this.rows[index] = {
+        ...this.rows[index],
+        ...values,
+      };
+      return;
+    }
+
+    this.rows.push({ ...values });
+  }
+
+  async create(values: Record<string, unknown>): Promise<Record<string, unknown>> {
+    if (this.findUniqueMatch(values) >= 0) {
+      const error = new Error("unique constraint") as Error & { name: string; code: string };
+      error.name = "SequelizeUniqueConstraintError";
+      error.code = "23505";
+      throw error;
+    }
+
+    const row = {
+      id: typeof values.id === "string" ? values.id : `row_${++this.sequence}`,
+      ...values,
+    };
+
+    this.rows.push(row);
+    return { ...row };
+  }
+
+  async findOne(input: { where: Record<string, unknown> }): Promise<Record<string, unknown> | null> {
+    const match = this.rows.find((row) => this.matchesWhere(row, input.where));
+    return match === undefined ? null : { ...match };
+  }
+
+  async findAll(input: { where: Record<string, unknown> }): Promise<readonly Record<string, unknown>[]> {
+    return this.rows.filter((row) => this.matchesWhere(row, input.where)).map((row) => ({ ...row }));
+  }
+
+  async update(values: Record<string, unknown>, input: { where: Record<string, unknown> }): Promise<void> {
+    for (let index = 0; index < this.rows.length; index += 1) {
+      if (this.matchesWhere(this.rows[index]!, input.where)) {
+        this.rows[index] = {
+          ...this.rows[index],
+          ...values,
+        };
+      }
+    }
+  }
+
+  async destroy(input: { where: Record<string, unknown> }): Promise<void> {
+    for (let index = this.rows.length - 1; index >= 0; index -= 1) {
+      if (this.matchesWhere(this.rows[index]!, input.where)) {
+        this.rows.splice(index, 1);
+      }
+    }
+  }
+
+  private findUniqueMatch(values: Record<string, unknown>): number {
+    for (const fields of this.uniqueConstraints) {
+      const index = this.rows.findIndex((row) => fields.every((field) => row[field] === values[field]));
+
+      if (index >= 0) {
+        return index;
+      }
+    }
+
+    return -1;
+  }
+
+  private matchesWhere(row: Record<string, unknown>, where: Record<string, unknown>): boolean {
+    for (const [field, value] of Object.entries(where)) {
+      if (row[field] !== value) {
+        return false;
+      }
+    }
+
+    return true;
+  }
+}
+
+describe("sequelize model default path", () => {
+  test("bundle from models provides end-to-end default repository behavior", async () => {
+    const bundle = createSequelizeRepositoryBundleFromModels({
+      customers: new InMemorySequelizeModel([["processor", "processorId"]]),
+      idempotency: new InMemorySequelizeModel([["scope", "key"]]),
+      stripeCustomers: new InMemorySequelizeModel([["processorId"]]),
+      stripeAccounts: new InMemorySequelizeModel([["processorId"]]),
+      paymentMethods: new InMemorySequelizeModel([["processorId"]]),
+      charges: new InMemorySequelizeModel([["processorId"]]),
+      subscriptions: new InMemorySequelizeModel([["processorId"]]),
+      invoices: new InMemorySequelizeModel([["processorId"]]),
+      webhookEvents: new InMemorySequelizeModel([["processor", "eventId"]]),
+      outbox: new InMemorySequelizeModel(),
+    });
+
+    await bundle.core.customers.save({
+      id: "cus_local_1",
+      ownerType: "User",
+      ownerId: "42",
+      processor: "stripe",
+      processorId: "cus_123",
+      email: "user@example.com",
+    });
+    expect(
+      (await bundle.core.customers.findByOwner({ ownerType: "User", ownerId: "42", processor: "stripe" }))
+        ?.processorId,
+    ).toBe("cus_123");
+
+    expect(await bundle.core.idempotency.reserve({ scope: "webhook", key: "evt_1" })).toBe("created");
+    expect(await bundle.core.idempotency.reserve({ scope: "webhook", key: "evt_1" })).toBe("exists");
+
+    await bundle.facade.paymentMethods?.upsert({
+      id: "pm_local_1",
+      processor: "stripe",
+      processorId: "pm_1",
+      customerProcessorId: "cus_123",
+      methodType: "card",
+      isDefault: true,
+      rawPayload: {},
+    });
+    await bundle.facade.paymentMethods?.clearDefaultForCustomer("cus_123");
+
+    const methods = await bundle.facade.paymentMethods?.listByCustomer("cus_123");
+    expect(methods?.[0]?.isDefault).toBe(false);
+
+    const queue = createDbOutboxQueueAdapter({
+      outbox: bundle.webhook.outboxRepository,
+      now: () => new Date(100),
+    });
+    const pipeline = createPersistFirstWebhookPipeline({
+      idempotencyRepository: bundle.webhook.idempotencyRepository,
+      eventRepository: bundle.webhook.eventRepository,
+      queue,
+      processEvent: async () => {
+        return;
+      },
+    });
+
+    const first = await pipeline.ingest({
+      processor: "stripe",
+      eventId: "evt_default_1",
+      eventType: "customer.updated",
+      payload: {},
+      receivedAt: new Date(100),
+    });
+    const replay = await pipeline.ingest({
+      processor: "stripe",
+      eventId: "evt_default_1",
+      eventType: "customer.updated",
+      payload: {},
+      receivedAt: new Date(100),
+    });
+
+    await drainDbOutboxQueue({
+      outbox: bundle.webhook.outboxRepository,
+      pipeline,
+      now: () => new Date(100),
+    });
+
+    const persisted = await bundle.webhook.eventRepository.findByEventId({
+      processor: "stripe",
+      eventId: "evt_default_1",
+    });
+
+    expect(first.status).toBe("queued");
+    expect(replay.status).toBe("duplicate");
+    expect(persisted?.processedAt).toBeInstanceOf(Date);
+  });
+
+  test("delegates from models fall back to in-memory idempotency when no model is provided", async () => {
+    const delegates = createSequelizeDelegatesFromModels({
+      customers: new InMemorySequelizeModel([["processor", "processorId"]]),
+      stripeCustomers: new InMemorySequelizeModel([["processorId"]]),
+      stripeAccounts: new InMemorySequelizeModel([["processorId"]]),
+      paymentMethods: new InMemorySequelizeModel([["processorId"]]),
+      charges: new InMemorySequelizeModel([["processorId"]]),
+      subscriptions: new InMemorySequelizeModel([["processorId"]]),
+      invoices: new InMemorySequelizeModel([["processorId"]]),
+      webhookEvents: new InMemorySequelizeModel([["processor", "eventId"]]),
+      outbox: new InMemorySequelizeModel(),
+    });
+
+    expect(await delegates.idempotency.reserve({ scope: "checkout", key: "owner:42" })).toBe("created");
+    expect(await delegates.idempotency.reserve({ scope: "checkout", key: "owner:42" })).toBe("exists");
+    await delegates.idempotency.release({ scope: "checkout", key: "owner:42" });
+    expect(await delegates.idempotency.reserve({ scope: "checkout", key: "owner:42" })).toBe("created");
+  });
+});
+
 describe("sequelize repository bundle", () => {
   test("repository bundle exposes facade and webhook wiring shape", async () => {
     const customers = new Map<string, CustomerRecord>();
@@ -631,6 +875,11 @@ describe("sequelize repository bundle", () => {
         },
       },
       stripeCustomers: {
+        async upsert() {
+          return;
+        },
+      },
+      stripeAccounts: {
         async upsert() {
           return;
         },
@@ -720,6 +969,7 @@ describe("sequelize repository bundle", () => {
     const found = await bundle.core.customers.findByOwner({ ownerType: "User", ownerId: "42" });
 
     expect(bundle.facade.paymentMethods).toBeDefined();
+    expect(bundle.facade.accounts).toBeDefined();
     expect(bundle.webhook.eventRepository).toBeDefined();
     expect(found?.processorId).toBe("cus_123");
   });

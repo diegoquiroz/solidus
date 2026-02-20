@@ -121,6 +121,7 @@ function createFakeStripe(): Stripe {
   let lastBillingPortalCreateParams: Stripe.BillingPortal.SessionCreateParams | undefined;
   let lastMeterEventParams: Record<string, unknown> | undefined;
   let lastTransferCreateParams: Stripe.TransferCreateParams | undefined;
+  let lastInvoicePreviewParams: Stripe.InvoiceCreatePreviewParams | undefined;
 
   const createCustomer = async (params: Stripe.CustomerCreateParams): Promise<Stripe.Customer> => {
     const customer = {
@@ -411,6 +412,23 @@ function createFakeStripe(): Stripe {
     } as Stripe.ApiList<Stripe.Invoice>;
   };
 
+  const previewInvoice = async (
+    params: Stripe.InvoiceCreatePreviewParams,
+  ): Promise<Stripe.Invoice> => {
+    lastInvoicePreviewParams = params;
+
+    return {
+      id: "in_preview_1",
+      object: "invoice",
+      customer: params.customer ?? null,
+      subscription: params.subscription ?? null,
+      status: "draft",
+      amount_due: 0,
+      amount_paid: 0,
+      currency: "usd",
+    } as unknown as Stripe.Invoice;
+  };
+
   const createCheckoutSession = async (
     params: Stripe.Checkout.SessionCreateParams,
   ): Promise<Stripe.Checkout.Session> => {
@@ -585,6 +603,7 @@ function createFakeStripe(): Stripe {
     },
     invoices: {
       list: listInvoices,
+      createPreview: previewInvoice,
       pay: async (_id: string) => ({ id: "in_1", object: "invoice" }) as Stripe.Invoice,
     },
     __testState: {
@@ -594,6 +613,7 @@ function createFakeStripe(): Stripe {
       getLastBillingPortalCreateParams: () => lastBillingPortalCreateParams,
       getLastMeterEventParams: () => lastMeterEventParams,
       getLastTransferCreateParams: () => lastTransferCreateParams,
+      getLastInvoicePreviewParams: () => lastInvoicePreviewParams,
     },
   } as unknown as Stripe;
 }
@@ -606,6 +626,7 @@ type FakeStripeWithState = Stripe & {
     getLastBillingPortalCreateParams(): Stripe.BillingPortal.SessionCreateParams | undefined;
     getLastMeterEventParams(): Record<string, unknown> | undefined;
     getLastTransferCreateParams(): Stripe.TransferCreateParams | undefined;
+    getLastInvoicePreviewParams(): Stripe.InvoiceCreatePreviewParams | undefined;
   };
 };
 
@@ -658,6 +679,33 @@ describe("stripe core APIs", () => {
     expect(methods.length).toBe(1);
     expect(methods[0]?.processorId).toBe("pm_2");
     expect(methods[0]?.isDefault).toBe(true);
+  });
+
+  test("updates payment method with Pay update_payment_method semantics", async () => {
+    const paymentMethodRepo = new InMemoryPaymentMethodRepo();
+    const api = createStripeCoreApi({
+      stripe: createFakeStripe(),
+      repositories: { paymentMethods: paymentMethodRepo },
+    });
+
+    await api.customers.create({ email: "pm-update@example.com" });
+    await api.paymentMethods.add({
+      customerId: "cus_1",
+      paymentMethodId: "pm_old",
+      setAsDefault: true,
+    });
+
+    const updated = await api.customers.updatePaymentMethod({
+      customerId: "cus_1",
+      paymentMethodId: "pm_new",
+    });
+    const customer = await api.customers.retrieve("cus_1");
+    const methods = await paymentMethodRepo.listByCustomer("cus_1");
+
+    expect(updated.processorId).toBe("pm_new");
+    expect(updated.isDefault).toBe(true);
+    expect(customer.invoice_settings.default_payment_method).toBe("pm_new");
+    expect(methods.find((value) => value.processorId === "pm_old")?.isDefault).toBe(false);
   });
 
   test("creates charges, supports capture and refund", async () => {
@@ -839,6 +887,28 @@ describe("stripe core APIs", () => {
     expect(stripe.__testState.getLastCheckoutCreateParams()?.automatic_tax?.enabled).toBe(true);
   });
 
+  test("creates checkout charge sessions with Pay checkout_charge defaults", async () => {
+    const stripe = createFakeStripe() as FakeStripeWithState;
+    const api = createStripeCoreApi({ stripe });
+
+    const session = await api.checkout.checkoutCharge({
+      customerId: "cus_1",
+      successUrl: "https://app.example/charge/success",
+      cancelUrl: "https://app.example/charge/cancel",
+      amount: 1500,
+      name: "One-time add-on",
+    });
+
+    const lastParams = stripe.__testState.getLastCheckoutCreateParams();
+    const firstLineItem = lastParams?.line_items?.[0] as Stripe.Checkout.SessionCreateParams.LineItem;
+
+    expect(session.mode).toBe("payment");
+    expect(firstLineItem.price_data?.currency).toBe("usd");
+    expect(firstLineItem.price_data?.product_data?.name).toBe("One-time add-on");
+    expect(firstLineItem.price_data?.unit_amount).toBe(1500);
+    expect(firstLineItem.quantity).toBe(1);
+  });
+
   test("creates billing portal sessions and meter events", async () => {
     const stripe = createFakeStripe() as FakeStripeWithState;
     const api = createStripeCoreApi({ stripe });
@@ -969,6 +1039,24 @@ describe("stripe core APIs", () => {
     expect(retryInvoices.length).toBe(1);
     expect(subscriptionRepo.values.length).toBeGreaterThan(0);
     expect(stripe.__testState.getLastSubscriptionCreateParams()?.automatic_tax?.enabled).toBe(true);
+  });
+
+  test("previews invoices for customer and subscription", async () => {
+    const stripe = createFakeStripe() as FakeStripeWithState;
+    const api = createStripeCoreApi({ stripe });
+
+    await api.customers.previewInvoice({
+      customerId: "cus_1",
+    });
+
+    expect(stripe.__testState.getLastInvoicePreviewParams()?.customer).toBe("cus_1");
+
+    const preview = await api.subscriptions.previewInvoice({
+      subscriptionId: "sub_1",
+    });
+
+    expect(stripe.__testState.getLastInvoicePreviewParams()?.subscription).toBe("sub_1");
+    expect(preview.object).toBe("invoice");
   });
 
   test("keeps paused subscriptions active across cancel and resume transitions", async () => {

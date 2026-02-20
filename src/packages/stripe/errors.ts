@@ -1,5 +1,26 @@
 import { ActionRequiredError, ConfigurationError, ProviderError } from "../core/errors.ts";
 
+export class MalformedCheckoutClientReferenceError extends ActionRequiredError {
+  constructor(message: string, details?: Record<string, unknown>) {
+    super(message, { details });
+    this.name = "MalformedCheckoutClientReferenceError";
+  }
+}
+
+export class UnknownCheckoutClientReferenceModelError extends ActionRequiredError {
+  constructor(message: string, details?: Record<string, unknown>) {
+    super(message, { details });
+    this.name = "UnknownCheckoutClientReferenceModelError";
+  }
+}
+
+export class CheckoutOwnerMismatchError extends ActionRequiredError {
+  constructor(message: string, details?: Record<string, unknown>) {
+    super(message, { details });
+    this.name = "CheckoutOwnerMismatchError";
+  }
+}
+
 interface StripeErrorLike {
   readonly type?: string;
   readonly code?: string;

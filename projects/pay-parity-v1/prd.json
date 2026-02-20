@@ -14,8 +14,8 @@
         "bun test passes"
       ],
       "priority": 1,
-      "passes": false,
-      "notes": "",
+      "passes": true,
+      "notes": "Implemented runtime owner-link parsing against registered customer models with typed malformed/unknown reference errors; validated with bun test.",
       "dependsOn": []
     },
     {
@@ -31,8 +31,8 @@
         "bun run test:example-app passes"
       ],
       "priority": 2,
-      "passes": false,
-      "notes": "",
+      "passes": true,
+      "notes": "Added default linkCheckoutOwner effect, wired both checkout completion events, added idempotency/mismatch guardrail tests; validated with bun test and bun run test:example-app.",
       "dependsOn": [
         "US-001"
       ]
@@ -50,8 +50,8 @@
         "bun run test:example-app passes"
       ],
       "priority": 3,
-      "passes": false,
-      "notes": "",
+      "passes": true,
+      "notes": "Added default syncAccountById account projection effect and onboarding-status coverage; validated with bun test and bun run test:example-app.",
       "dependsOn": [
         "US-002"
       ]
@@ -67,8 +67,8 @@
         "bun test passes"
       ],
       "priority": 4,
-      "passes": false,
-      "notes": "",
+      "passes": true,
+      "notes": "Published parity inventory + migration mapping in docs and expanded Stripe-first convenience documentation with intentional-difference callouts.",
       "dependsOn": [
         "US-001",
         "US-002",
@@ -86,8 +86,8 @@
         "bun test passes"
       ],
       "priority": 5,
-      "passes": false,
-      "notes": "",
+      "passes": true,
+      "notes": "Delivered machine-readable parity artifact at docs/pay-stripe-parity-matrix.json and linked it from README.",
       "dependsOn": [
         "US-004"
       ]
@@ -105,8 +105,8 @@
         "bun run test:example-app passes"
       ],
       "priority": 6,
-      "passes": false,
-      "notes": "",
+      "passes": true,
+      "notes": "Added Pay-parity helper coverage (customers.updatePaymentMethod, customers.previewInvoice, subscriptions.previewInvoice, checkout.checkoutCharge) with typed APIs and tests; validated with bun test, bun run test:integration, and bun run test:example-app.",
       "dependsOn": [
         "US-005"
       ]
@@ -124,8 +124,8 @@
         "bun run test:example-app passes"
       ],
       "priority": 7,
-      "passes": false,
-      "notes": "",
+      "passes": true,
+      "notes": "Extended webhook parity tests to verify subscriber suppression/diagnostics/replay idempotency across new default effects; validated with bun test and bun run test:integration.",
       "dependsOn": [
         "US-006"
       ]
@@ -141,8 +141,8 @@
         "bun test passes"
       ],
       "priority": 8,
-      "passes": false,
-      "notes": "",
+      "passes": true,
+      "notes": "Published canonical quickstart at docs/getting-started.md and updated README to point to that single path; validated repo with bun test.",
       "dependsOn": [
         "US-004"
       ]
@@ -158,8 +158,25 @@
         "bun test passes"
       ],
       "priority": 10,
-      "passes": false,
-      "notes": "",
+      "passes": true,
+      "notes": "Published Pay-style docs set for customers, payment methods, charges, subscriptions, and webhooks with migration callouts and cross-links; validated repo with bun test.",
+      "dependsOn": [
+        "US-008"
+      ]
+    },
+    {
+      "id": "US-010",
+      "title": "Publish explicit non-portable-from-Rails guidance",
+      "description": "As a migration owner, I want explicit documentation for behaviors that are intentionally not portable from Pay on Rails.",
+      "acceptanceCriteria": [
+        "A dedicated docs/not-portable-from-rails.md file is published.",
+        "README, migration docs, and release notes docs link to the non-portable guidance.",
+        "Differences are stated as explicit scope/behavior choices.",
+        "bun test passes"
+      ],
+      "priority": 10,
+      "passes": true,
+      "notes": "Published docs/not-portable-from-rails.md and linked it from README, migration guide, and release notes guide; validated repo with bun test.",
       "dependsOn": [
         "US-009"
       ]
@@ -175,11 +192,12 @@
         "bun test passes"
       ],
       "priority": 11,
-      "passes": false,
-      "notes": "",
+      "passes": true,
+      "notes": "Published docs/sequelize-express-production-hardening.md with topology, retry/replay/dead-letter, secret rotation, policy, rollback toggles, and incident checklist; validated repo with bun test.",
       "dependsOn": [
         "US-008",
-        "US-009"
+        "US-009",
+        "US-010"
       ]
     },
     {
@@ -195,8 +213,8 @@
         "bun run test:example-app passes"
       ],
       "priority": 12,
-      "passes": false,
-      "notes": "",
+      "passes": true,
+      "notes": "Added first-party model-based Sequelize repository path (createSequelizeDelegatesFromModels/createSequelizeRepositoryBundleFromModels) so common setups avoid hand-written delegates; covered with end-to-end tests and validated with bun test + bun run test:example-app.",
       "dependsOn": [
         "US-003",
         "US-011"
@@ -215,8 +233,8 @@
         "bun run test:example-app passes"
       ],
       "priority": 13,
-      "passes": false,
-      "notes": "",
+      "passes": true,
+      "notes": "Expanded example app parity smoke flows for processor assignment, checkout owner linking, SCA action-required handling, subscription lifecycle, and webhook replay with projection/observability assertions; validated with bun test + bun run test:example-app.",
       "dependsOn": [
         "US-012"
       ]
@@ -235,9 +253,10 @@
         "bun run test:runtime passes"
       ],
       "priority": 14,
-      "passes": false,
-      "notes": "",
+      "passes": true,
+      "notes": "Completed sign-off checklist artifact and executed required validation commands (bun test, bun run test:integration, bun run test:example-app, bun run test:runtime); all dependency stories in this plan now pass.",
       "dependsOn": [
+        "US-005",
         "US-007",
         "US-010",
         "US-013"

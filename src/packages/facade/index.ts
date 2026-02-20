@@ -1,5 +1,5 @@
 import type Stripe from "stripe";
-import type { CustomerRecord, CustomerRepository } from "../core/contracts.ts";
+import type { CustomerRecord, CustomerRegistry, CustomerRepository } from "../core/contracts.ts";
 import { ConfigurationError } from "../core/errors.ts";
 import type { StripeCoreApiOptions } from "../stripe/core-apis.ts";
 import { createStripeCoreApi } from "../stripe/core-apis.ts";
@@ -22,7 +22,11 @@ export interface SolidusFacadeOptions {
   stripe: Stripe;
   repositories?: StripeCoreApiOptions["repositories"];
   ownerCustomers?: CustomerRepository;
-  webhookRepositories?: Omit<StripeDefaultWebhookEffectRepositories, "customers" | "paymentMethods" | "charges" | "subscriptions">;
+  customerRegistry?: CustomerRegistry;
+  webhookRepositories?: Omit<
+    StripeDefaultWebhookEffectRepositories,
+    "customers" | "accounts" | "paymentMethods" | "charges" | "subscriptions" | "ownerCustomers"
+  >;
   customerAttributeMapper?: StripeCoreApiOptions["customerAttributeMapper"];
   webhookEffects?: StripeWebhookEffects;
   webhookRegistration?: {
@@ -104,11 +108,14 @@ export function createSolidusFacade(options: SolidusFacadeOptions) {
         stripe: options.stripe,
         repositories: {
           customers: options.repositories?.customers,
+          accounts: options.repositories?.accounts,
           paymentMethods: options.repositories?.paymentMethods,
           charges: options.repositories?.charges,
           subscriptions: options.repositories?.subscriptions,
           invoices: options.webhookRepositories?.invoices,
+          ownerCustomers: options.ownerCustomers,
         },
+        customerRegistry: options.customerRegistry,
       });
 
   const defaultHandlers = createStripeWebhookHandlers({

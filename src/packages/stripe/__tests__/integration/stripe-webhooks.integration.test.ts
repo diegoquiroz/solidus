@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import Stripe from "stripe";
+import type { CustomerRecord, CustomerRepository } from "../../../core/contracts.ts";
 import {
   createDbOutboxQueueAdapter,
   createPersistFirstWebhookPipeline,
@@ -10,12 +11,61 @@ import {
   type WebhookEventRepository,
 } from "../../../core/webhooks.ts";
 import type { IdempotencyRepository, QueueJob } from "../../../core/contracts.ts";
+import { createCustomerRegistry, registerCustomerModel } from "../../../core/registration.ts";
 import { createStripeWebhookHandler, type ExpressLikeResponse } from "../../../express/index.ts";
+import type { StripeAccountProjection, StripeAccountProjectionRepository } from "../../core-apis.ts";
+import { createDefaultStripeWebhookEffects } from "../../default-webhook-effects.ts";
 import {
   createStripeWebhookHandlers,
   createStripeWebhookProcessor,
   requiredStripeWebhookEvents,
 } from "../../webhooks.ts";
+
+class InMemoryOwnerCustomerRepository implements CustomerRepository {
+  readonly values = new Map<string, CustomerRecord>();
+  saveCalls = 0;
+
+  async save(customer: CustomerRecord): Promise<void> {
+    this.saveCalls += 1;
+    this.values.set(`${customer.ownerType}:${customer.ownerId}`, customer);
+  }
+
+  async findByOwner(input: {
+    ownerType: string;
+    ownerId: string;
+    processor?: string;
+  }): Promise<CustomerRecord | null> {
+    const value = this.values.get(`${input.ownerType}:${input.ownerId}`);
+
+    if (value === undefined) {
+      return null;
+    }
+
+    if (input.processor !== undefined && value.processor !== input.processor) {
+      return null;
+    }
+
+    return value;
+  }
+
+  async findByProcessor(input: { processor: string; processorId: string }): Promise<CustomerRecord | null> {
+    for (const value of this.values.values()) {
+      if (value.processor === input.processor && value.processorId === input.processorId) {
+        return value;
+      }
+    }
+
+    return null;
+  }
+}
+
+class InMemoryAccountProjectionRepository implements StripeAccountProjectionRepository {
+  readonly values = new Map<string, StripeAccountProjection>();
+
+  async upsert(account: StripeAccountProjection): Promise<void> {
+    this.values.set(account.processorId, account);
+  }
+}
 
 interface FixtureEvent {
   id: string;
@@ -411,6 +461,121 @@ describe("stripe webhook parity integration", () => {
     expect(second.body).toEqual({ received: true, duplicate: true });
     expect(syncCalls).toBe(1);
     expect(customerProjection.get("cus_replay_1")).toBe(1);
+  });
+
+  test("signed checkout and account events apply default owner-linking and account sync effects", async () => {
+    const idempotencyRepository = new InMemoryIdempotencyRepository();
+    const eventRepository = new InMemoryWebhookEventRepository();
+    const outbox = new InMemoryDbOutboxRepository();
+    const queue = createDbOutboxQueueAdapter({ outbox });
+    const ownerCustomers = new InMemoryOwnerCustomerRepository();
+    const accountProjections = new InMemoryAccountProjectionRepository();
+    const customerRegistry = createCustomerRegistry();
+    registerCustomerModel(customerRegistry, {
+      modelName: "User",
+      resolveOwner: (record: { id: string }) => record,
+      isDefault: true,
+    });
+
+    const processor = createStripeWebhookProcessor({
+      handlers: createStripeWebhookHandlers({
+        effects: createDefaultStripeWebhookEffects({
+          stripe: {
+            accounts: {
+              retrieve: async (id: string) => ({
+                id,
+                object: "account",
+                charges_enabled: true,
+                payouts_enabled: id === "acct_ready",
+                details_submitted: true,
+                requirements: {
+                  currently_due: [],
+                  eventually_due: [],
+                  past_due: id === "acct_ready" ? [] : ["external_account"],
+                  pending_verification: [],
+                },
+              } as unknown as Stripe.Account),
+            },
+          } as unknown as Stripe,
+          repositories: {
+            ownerCustomers,
+            accounts: accountProjections,
+          },
+          customerRegistry,
+        }),
+      }),
+    });
+
+    const pipeline = createPersistFirstWebhookPipeline({
+      idempotencyRepository,
+      eventRepository,
+      queue,
+      processEvent: async (event) => {
+        await processor.process(event.payload as Stripe.Event);
+      },
+    });
+
+    const stripe = new Stripe("sk_test_123", {});
+    const secret = "whsec_default_effects";
+    const handler = createStripeWebhookHandler({
+      stripe,
+      webhookSecrets: [secret],
+      pipeline,
+    });
+
+    const completed = await createSignedStripeRequest({
+      stripe,
+      secret,
+      eventId: "evt_owner_complete_1",
+      eventType: "checkout.session.completed",
+      object: {
+        id: "cs_1",
+        client_reference_id: "User:42",
+        customer: "cus_owner_1",
+      },
+    });
+    const asyncPaid = await createSignedStripeRequest({
+      stripe,
+      secret,
+      eventId: "evt_owner_async_1",
+      eventType: "checkout.session.async_payment_succeeded",
+      object: {
+        id: "cs_2",
+        client_reference_id: "User:42",
+        customer: "cus_owner_1",
+      },
+    });
+    const accountUpdated = await createSignedStripeRequest({
+      stripe,
+      secret,
+      eventId: "evt_account_updated_1",
+      eventType: "account.updated",
+      object: {
+        id: "acct_ready",
+      },
+    });
+
+    for (const request of [completed, asyncPaid, accountUpdated]) {
+      const capture = createResponseCapture();
+      await handler(
+        {
+          headers: {
+            "Stripe-Signature": request.signature,
+          },
+          body: request.payload,
+        },
+        capture.response,
+        () => {},
+      );
+      expect(capture.statusCode).toBe(200);
+    }
+
+    await drainDbOutboxQueue({ outbox, pipeline });
+
+    expect(ownerCustomers.values.get("User:42")?.processorId).toBe("cus_owner_1");
+    expect(ownerCustomers.saveCalls).toBe(1);
+    expect(accountProjections.values.get("acct_ready")?.payoutsEnabled).toBe(true);
+    expect(accountProjections.values.get("acct_ready")?.pastDue).toEqual([]);
   });
 
   test("webhook failures retry and then dead-letter on terminal exhaustion", async () => {

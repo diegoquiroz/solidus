@@ -88,6 +88,40 @@ describe("stripe webhook handlers", () => {
     expect(calls).toEqual(["sync:pi_123"]);
   });
 
+  test("links checkout owners for completed and async payment succeeded events", async () => {
+    const calls: string[] = [];
+    const processor = createStripeWebhookProcessor({
+      handlers: createStripeWebhookHandlers({
+        effects: {
+          async linkCheckoutOwner(input) {
+            calls.push(`${input.event.type}:${input.clientReferenceId}:${input.customerId}`);
+          },
+        },
+      }),
+    });
+
+    await processor.process(
+      makeEvent("checkout.session.completed", {
+        id: "cs_1",
+        client_reference_id: "User:1",
+        customer: "cus_1",
+      }),
+    );
+
+    await processor.process(
+      makeEvent("checkout.session.async_payment_succeeded", {
+        id: "cs_2",
+        client_reference_id: "User:1",
+        customer: "cus_1",
+      }),
+    );
+
+    expect(calls).toEqual([
+      "checkout.session.completed:User:1:cus_1",
+      "checkout.session.async_payment_succeeded:User:1:cus_1",
+    ]);
+  });
+
   test("converts Uint8Array payloads into UTF-8 strings", async () => {
     const payloads: string[] = [];
     const stripe = {

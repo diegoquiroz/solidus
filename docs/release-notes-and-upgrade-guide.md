@@ -44,6 +44,7 @@ const facade = createSolidusFacade({
 3. Enable webhook ingestion with persist-first processing and explicit event mode policy for your environment (`docs/express-webhooks.md`).
 4. Review migration mapping for existing Stripe wrappers (`docs/migration-from-ad-hoc-stripe.md`).
 5. Review operations guidance for replay/dead-letter handling (`docs/webhook-operations-runbook.md`).
+6. Review Rails portability caveats and intentional differences (`docs/not-portable-from-rails.md`).
 
 ## Pay parity delta (v1)
 
@@ -66,10 +67,24 @@ const facade = createSolidusFacade({
 - Webhook event mode defaults remain backward-compatible (`allowLiveEvents: true`, `allowTestEvents: true`); production deployments should explicitly disable test events where required.
 - Customer registration does not auto-link existing Stripe customers; use explicit reconciliation flows (`customers.reconcileByEmail` or `customers.reconcileByProcessorId`).
 - `createFacadePlaceholder` remains available for compatibility with earlier milestone artifacts; new integrations should use `createSolidusFacade`.
+- Rails callback/migration conventions are not first-party portable in this scope; see `docs/not-portable-from-rails.md`.
+
+## Reference docs published for parity milestones
+
+- Canonical quickstart: `docs/getting-started.md`
+- Pay parity matrix (machine-readable): `docs/pay-stripe-parity-matrix.json`
+- Pay parity sign-off checklist (US-014): `docs/pay-parity-signoff-checklist.md`
+- Pay-style domain docs:
+  - `docs/pay-customers.md`
+  - `docs/pay-payment-methods.md`
+  - `docs/pay-charges.md`
+  - `docs/pay-subscriptions.md`
+  - `docs/pay-webhooks.md`
+- Sequelize + Express production hardening: `docs/sequelize-express-production-hardening.md`
 
 ## Validation checklist
 
-- `bun run docs:core`
-- `bun run lint`
-- `bun run typecheck`
 - `bun test`
+- `bun run test:integration`
+- `bun run test:example-app`
+- `bun run test:runtime`

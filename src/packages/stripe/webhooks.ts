@@ -425,9 +425,20 @@ export function createStripeWebhookHandlers(input: {
 
     "checkout.session.async_payment_succeeded": async (event) => {
       const object = getObject(event);
+      const clientReferenceId =
+        typeof object.client_reference_id === "string" ? object.client_reference_id : undefined;
+      const customerId = typeof object.customer === "string" ? object.customer : undefined;
       const paymentIntentId =
         typeof object.payment_intent === "string" ? object.payment_intent : undefined;
       const subscriptionId = typeof object.subscription === "string" ? object.subscription : undefined;
+
+      if (clientReferenceId !== undefined && customerId !== undefined) {
+        await effects.linkCheckoutOwner?.({
+          clientReferenceId,
+          customerId,
+          event,
+        });
+      }
 
       if (paymentIntentId !== undefined) {
         await effects.syncChargeByPaymentIntentId?.(paymentIntentId, event);

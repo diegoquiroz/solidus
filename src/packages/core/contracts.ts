@@ -15,6 +15,10 @@ export interface CustomerRepository {
     ownerId: string;
     processor?: string;
   }): Promise<CustomerRecord | null>;
+  findByProcessor?(input: {
+    processor: string;
+    processorId: string;
+  }): Promise<CustomerRecord | null>;
 }
 
 export interface IdempotencyRepository {

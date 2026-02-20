@@ -24,8 +24,28 @@ export interface StripeCustomerProjectionRepository {
   findByProcessorId?(processorId: string): Promise<StripeCustomerProjection | null>;
 }
 
+export interface StripeAccountProjection {
+  processor: "stripe";
+  processorId: string;
+  chargesEnabled: boolean;
+  payoutsEnabled: boolean;
+  detailsSubmitted: boolean;
+  disabledReason?: string;
+  currentlyDue: readonly string[];
+  eventuallyDue: readonly string[];
+  pastDue: readonly string[];
+  pendingVerification: readonly string[];
+  rawPayload: Stripe.Account;
+}
+
+export interface StripeAccountProjectionRepository {
+  upsert(account: StripeAccountProjection): Promise<void>;
+  findByProcessorId?(processorId: string): Promise<StripeAccountProjection | null>;
+}
+
 export interface StripeCoreRepositories {
   customers?: StripeCustomerProjectionRepository;
+  accounts?: StripeAccountProjectionRepository;
   paymentMethods?: PaymentMethodRepository;
   charges?: ChargeRepository;
   subscriptions?: SubscriptionRepository;
@@ -58,6 +78,8 @@ export interface StripePaymentMethodInput {
 export interface StripeSetDefaultPaymentMethodInput extends StripePaymentMethodInput {
   syncCustomerInvoiceSettings?: boolean;
 }
+
+export interface StripeUpdatePaymentMethodInput extends StripePaymentMethodInput {}
 
 export interface StripeChargeInput {
   customerId: string;
@@ -92,6 +114,16 @@ export interface StripeSubscriptionCreateInput {
   trialPeriodDays?: number;
   metadata?: Stripe.MetadataParam;
   stripeOptions?: Omit<Stripe.SubscriptionCreateParams, "customer" | "items" | "metadata">;
+}
+
+export interface StripeCustomerPreviewInvoiceInput {
+  customerId: string;
+  stripeOptions?: Omit<Stripe.InvoiceCreatePreviewParams, "customer">;
+}
+
+export interface StripeSubscriptionPreviewInvoiceInput {
+  subscriptionId: string;
+  stripeOptions?: Omit<Stripe.InvoiceCreatePreviewParams, "subscription">;
 }
 
 export interface StripeCheckoutUrls {
@@ -131,6 +163,20 @@ export interface StripeCheckoutSubscriptionSessionInput extends StripeCheckoutSe
   successUrl: string;
   cancelUrl: string;
   lineItems: Stripe.Checkout.SessionCreateParams.LineItem[];
+  stripeOptions?: Omit<
+    Stripe.Checkout.SessionCreateParams,
+    "mode" | "success_url" | "cancel_url" | "line_items" | "customer" | "customer_email" | "metadata"
+  >;
+}
+
+export interface StripeCheckoutChargeSessionInput extends StripeCheckoutSessionInputBase {
+  customerId: string;
+  successUrl: string;
+  cancelUrl: string;
+  amount: number;
+  name: string;
+  quantity?: number;
+  currency?: string;
   stripeOptions?: Omit<
     Stripe.Checkout.SessionCreateParams,
     "mode" | "success_url" | "cancel_url" | "line_items" | "customer" | "customer_email" | "metadata"
@@ -466,6 +512,25 @@ export function createStripeCoreApi(options: StripeCoreApiOptions) {
         return customer;
       } catch (error: unknown) {
         throw mapStripeError(error, "customers.update");
+      }
+    },
+
+    async updatePaymentMethod(input: StripeUpdatePaymentMethodInput): Promise<PaymentMethodRecord> {
+      return paymentMethods.add({
+        customerId: input.customerId,
+        paymentMethodId: input.paymentMethodId,
+        setAsDefault: true,
+      });
+    },
+
+    async previewInvoice(input: StripeCustomerPreviewInvoiceInput): Promise<Stripe.Invoice> {
+      try {
+        return await options.stripe.invoices.createPreview({
+          customer: input.customerId,
+          ...input.stripeOptions,
+        });
+      } catch (error: unknown) {
+        throw mapStripeError(error, "invoices.createPreview(customer)");
       }
     },
 
@@ -858,6 +923,17 @@ export function createStripeCoreApi(options: StripeCoreApiOptions) {
         throw mapStripeError(error, "invoices.pay(payOpenInvoices)");
       }
     },
+
+    async previewInvoice(input: StripeSubscriptionPreviewInvoiceInput): Promise<Stripe.Invoice> {
+      try {
+        return await options.stripe.invoices.createPreview({
+          subscription: input.subscriptionId,
+          ...input.stripeOptions,
+        });
+      } catch (error: unknown) {
+        throw mapStripeError(error, "invoices.createPreview(subscription)");
+      }
+    },
   };
 
   const checkout = {
@@ -940,6 +1016,30 @@ export function createStripeCoreApi(options: StripeCoreApiOptions) {
       } catch (error: unknown) {
         throw mapStripeError(error, "checkout.sessions.create(subscription)");
       }
+    },
+
+    async checkoutCharge(input: StripeCheckoutChargeSessionInput): Promise<Stripe.Checkout.Session> {
+      return checkout.createPaymentSession({
+        customerId: input.customerId,
+        customerEmail: input.customerEmail,
+        metadata: input.metadata,
+        applySessionIdToUrls: input.applySessionIdToUrls,
+        successUrl: input.successUrl,
+        cancelUrl: input.cancelUrl,
+        lineItems: [
+          {
+            price_data: {
+              currency: input.currency ?? "usd",
+              product_data: {
+                name: input.name,
+              },
+              unit_amount: input.amount,
+            },
+            quantity: input.quantity ?? 1,
+          },
+        ],
+        stripeOptions: input.stripeOptions,
+      });
     },
   };
 

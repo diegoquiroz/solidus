@@ -2,15 +2,21 @@ import type Stripe from "stripe";
 import type {
   ChargeRecord,
   ChargeRepository,
+  CustomerRepository,
+  CustomerRegistry,
   PaymentMethodRecord,
   PaymentMethodRepository,
   SubscriptionRecord,
   SubscriptionRepository,
 } from "../core/contracts.ts";
 import type {
+  StripeAccountProjection,
+  StripeAccountProjectionRepository,
   StripeCustomerProjection,
   StripeCustomerProjectionRepository,
 } from "./core-apis.ts";
+import { CheckoutOwnerMismatchError } from "./errors.ts";
+import { parseCheckoutClientReferenceId } from "./owner-linking.ts";
 import type { StripeWebhookEffects } from "./webhooks.ts";
 
 export interface StripeInvoiceProjection {
@@ -34,15 +40,18 @@ export interface StripeInvoiceProjectionRepository {
 
 export interface StripeDefaultWebhookEffectRepositories {
   customers?: StripeCustomerProjectionRepository;
+  accounts?: StripeAccountProjectionRepository;
   paymentMethods?: PaymentMethodRepository;
   charges?: ChargeRepository;
   subscriptions?: SubscriptionRepository;
   invoices?: StripeInvoiceProjectionRepository;
+  ownerCustomers?: CustomerRepository;
 }
 
 export interface StripeDefaultWebhookEffectsOptions {
   stripe: Stripe;
   repositories?: StripeDefaultWebhookEffectRepositories;
+  customerRegistry?: CustomerRegistry;
   resolveRequestOptions?: (event: Stripe.Event) => Stripe.RequestOptions | undefined;
 }
 
@@ -255,6 +264,30 @@ function toInvoiceProjection(invoice: Stripe.Invoice): StripeInvoiceProjection {
   };
 }
 
+function toStringArray(value: unknown): readonly string[] {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  return value.filter((entry): entry is string => typeof entry === "string");
+}
+
+function toAccountProjection(account: Stripe.Account): StripeAccountProjection {
+  return {
+    processor: "stripe",
+    processorId: account.id,
+    chargesEnabled: account.charges_enabled,
+    payoutsEnabled: account.payouts_enabled,
+    detailsSubmitted: account.details_submitted,
+    disabledReason: account.requirements?.disabled_reason ?? undefined,
+    currentlyDue: toStringArray(account.requirements?.currently_due),
+    eventuallyDue: toStringArray(account.requirements?.eventually_due),
+    pastDue: toStringArray(account.requirements?.past_due),
+    pendingVerification: toStringArray(account.requirements?.pending_verification),
+    rawPayload: account,
+  };
+}
+
 function toChargeRecord(input: {
   charge: Stripe.Charge;
   paymentIntent: Stripe.PaymentIntent | null;
@@ -326,6 +359,15 @@ export function createDefaultStripeWebhookEffects(
         processorId: customerId,
         rawPayload: event.data.object as Stripe.Customer,
       });
+    },
+
+    async syncAccountById(accountId) {
+      if (repositories.accounts === undefined) {
+        return;
+      }
+
+      const account = await options.stripe.accounts.retrieve(accountId);
+      await repositories.accounts.upsert(toAccountProjection(account));
     },
 
     async syncPaymentMethodById(paymentMethodId, event) {
@@ -477,6 +519,70 @@ export function createDefaultStripeWebhookEffects(
       });
       const invoice = await options.stripe.invoices.retrieve(invoiceId, requestOptions);
       await repositories.invoices.upsert(toInvoiceProjection(invoice));
+    },
+
+    async linkCheckoutOwner(input) {
+      if (repositories.ownerCustomers === undefined || options.customerRegistry === undefined) {
+        return;
+      }
+
+      const parsed = parseCheckoutClientReferenceId({
+        clientReferenceId: input.clientReferenceId,
+        customerRegistry: options.customerRegistry,
+      });
+      const existing = await repositories.ownerCustomers.findByOwner({
+        ownerType: parsed.modelName,
+        ownerId: parsed.ownerId,
+        processor: "stripe",
+      });
+
+      if (existing !== null && existing.processorId !== input.customerId) {
+        throw new CheckoutOwnerMismatchError(
+          `Checkout owner ${parsed.modelName}:${parsed.ownerId} is already linked to a different Stripe customer.`,
+          {
+            ownerType: parsed.modelName,
+            ownerId: parsed.ownerId,
+            existingCustomerId: existing.processorId,
+            nextCustomerId: input.customerId,
+            eventId: input.event.id,
+          },
+        );
+      }
+
+      if (existing?.processorId === input.customerId) {
+        return;
+      }
+
+      const byProcessor = await repositories.ownerCustomers.findByProcessor?.({
+        processor: "stripe",
+        processorId: input.customerId,
+      });
+
+      if (
+        byProcessor !== undefined
+        && byProcessor !== null
+        && (byProcessor.ownerType !== parsed.modelName || byProcessor.ownerId !== parsed.ownerId)
+      ) {
+        throw new CheckoutOwnerMismatchError(
+          `Stripe customer ${input.customerId} is already linked to ${byProcessor.ownerType}:${byProcessor.ownerId}.`,
+          {
+            ownerType: parsed.modelName,
+            ownerId: parsed.ownerId,
+            existingOwnerType: byProcessor.ownerType,
+            existingOwnerId: byProcessor.ownerId,
+            customerId: input.customerId,
+            eventId: input.event.id,
+          },
+        );
+      }
+
+      await repositories.ownerCustomers.save({
+        id: `stripe_owner_${parsed.modelName}_${parsed.ownerId}`,
+        ownerType: parsed.modelName,
+        ownerId: parsed.ownerId,
+        processor: "stripe",
+        processorId: input.customerId,
+      });
     },
   };
 }

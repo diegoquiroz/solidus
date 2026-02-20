@@ -32,3 +32,15 @@ This guide helps teams move from direct Stripe SDK usage to Solidus with minimal
 - Keep idempotency at call sites while dual-running old and new code paths.
 - Compare key billing records for a sample of customers before cutover.
 - Keep a rollback toggle to route writes back to legacy Stripe wrappers during incident response.
+
+## Recommended migration docs path
+
+- Canonical setup path: `docs/getting-started.md`
+- Pay-style domain docs:
+  - `docs/pay-customers.md`
+  - `docs/pay-payment-methods.md`
+  - `docs/pay-charges.md`
+  - `docs/pay-subscriptions.md`
+  - `docs/pay-webhooks.md`
+- Production hardening: `docs/sequelize-express-production-hardening.md`
+- Rails non-portable differences: `docs/not-portable-from-rails.md`

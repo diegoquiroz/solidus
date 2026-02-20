@@ -2,6 +2,12 @@
 
 This guide documents the Stripe customer, payment method, charge/refund, subscription, checkout, billing portal, metering, and connect helper APIs.
 
+Related parity references:
+
+- Machine-readable parity matrix: `docs/pay-stripe-parity-matrix.json`
+- Release sign-off checklist: `docs/pay-parity-signoff-checklist.md`
+- Rails non-portable guidance: `docs/not-portable-from-rails.md`
+
 ## Customer reconciliation caveats
 
 - Solidus does not auto-link existing Stripe customers during registration.
@@ -22,7 +28,15 @@ await api.paymentMethods.add({
   paymentMethodId: "pm_from_setup_intent",
   setAsDefault: true,
 });
+
+await api.customers.updatePaymentMethod({
+  customerId: "cus_123",
+  paymentMethodId: "pm_next_default",
+});
 ```
+
+- `customers.updatePaymentMethod` mirrors Pay `update_payment_method`: attach payment method and set it as default for future invoices.
+- Keep `paymentMethods.add` for explicit `default: false` parity (`setAsDefault: false`).
 
 ## Checkout + Billing Portal
 
@@ -43,6 +57,14 @@ const checkout = await api.checkout.createSubscriptionSession({
   },
 });
 
+const oneTimeCheckout = await api.checkout.checkoutCharge({
+  customerId: "cus_123",
+  successUrl: "https://app.example/billing/success",
+  cancelUrl: "https://app.example/billing/cancel",
+  amount: 2500,
+  name: "One-time onboarding fee",
+});
+
 const portal = await api.billingPortal.createSession({
   customerId: "cus_123",
   returnUrl: "https://app.example/account/billing",
@@ -50,7 +72,22 @@ const portal = await api.billingPortal.createSession({
 ```
 
 - Checkout success/cancel/return URLs are normalized with `stripe_checkout_session_id={CHECKOUT_SESSION_ID}` for callback correlation.
+- `checkout.checkoutCharge` mirrors Pay `checkout_charge` defaults: `mode=payment`, `currency=usd`, and `quantity=1` unless overridden.
 - Keep entitlement state in sync from webhooks (for example `checkout.session.completed`, `invoice.paid`, `customer.subscription.updated`) rather than trusting redirect completion alone.
+
+## Invoice preview helpers
+
+Use Stripe preview invoice APIs through customer and subscription parity helpers.
+
+```ts
+const customerPreview = await api.customers.previewInvoice({
+  customerId: "cus_123",
+});
+
+const subscriptionPreview = await api.subscriptions.previewInvoice({
+  subscriptionId: "sub_123",
+});
+```
 
 ## SCA continuation flow (Express)
 

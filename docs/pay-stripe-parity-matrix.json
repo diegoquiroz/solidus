@@ -1,0 +1,128 @@
+{
+  "version": "2026-02-20",
+  "scope": "pay-stripe-v1",
+  "entries": [
+    {
+      "capability": "customers.create-update-reconcile",
+      "status": "implemented",
+      "solidusApi": [
+        "facade.api.customers.create",
+        "facade.api.customers.update",
+        "facade.api.customers.reconcileByEmail",
+        "facade.api.customers.reconcileByProcessorId"
+      ],
+      "docs": [
+        "docs/pay-customers.md",
+        "docs/stripe-core-apis.md"
+      ],
+      "notes": "Auto-link on registration is not implicit; use explicit reconciliation."
+    },
+    {
+      "capability": "payment-methods.attach-default-detach",
+      "status": "implemented",
+      "solidusApi": [
+        "facade.api.paymentMethods.add",
+        "facade.api.paymentMethods.setDefault",
+        "facade.api.paymentMethods.detach"
+      ],
+      "docs": [
+        "docs/pay-payment-methods.md",
+        "docs/stripe-core-apis.md"
+      ],
+      "notes": "SetupIntent-first pattern is recommended for production SCA flows."
+    },
+    {
+      "capability": "charges-authorize-capture-refund",
+      "status": "implemented",
+      "solidusApi": [
+        "facade.api.charges.charge",
+        "facade.api.charges.authorize",
+        "facade.api.charges.capture",
+        "facade.api.charges.refund"
+      ],
+      "docs": [
+        "docs/pay-charges.md",
+        "docs/stripe-core-apis.md"
+      ],
+      "notes": "SCA continuation surfaces ActionRequiredError with continuation metadata."
+    },
+    {
+      "capability": "subscriptions-lifecycle-and-state",
+      "status": "implemented",
+      "solidusApi": [
+        "facade.api.subscriptions.create",
+        "facade.api.subscriptions.cancel",
+        "facade.api.subscriptions.cancelNow",
+        "facade.api.subscriptions.resume",
+        "facade.api.subscriptions.swap",
+        "facade.api.subscriptions.changeQuantity",
+        "facade.api.subscriptions.pause",
+        "facade.api.subscriptions.unpause",
+        "facade.api.subscriptions.retryFailedPayment",
+        "facade.api.subscriptions.payOpenInvoices",
+        "facade.api.state"
+      ],
+      "docs": [
+        "docs/pay-subscriptions.md",
+        "docs/stripe-core-apis.md"
+      ],
+      "notes": "Pause default behavior uses void for Pay parity."
+    },
+    {
+      "capability": "webhooks-default-effects-and-owner-linking",
+      "status": "implemented",
+      "solidusApi": [
+        "createPersistFirstWebhookPipeline",
+        "createStripeWebhookRouter",
+        "createSolidusFacade({ webhookRegistration.enableDefaultEffects })"
+      ],
+      "docs": [
+        "docs/pay-webhooks.md",
+        "docs/express-webhooks.md",
+        "docs/stripe-webhook-coverage-matrix.md"
+      ],
+      "notes": "Persist-first with idempotency is required for safe replay semantics."
+    },
+    {
+      "capability": "checkout-and-billing-portal",
+      "status": "implemented",
+      "solidusApi": [
+        "facade.api.checkout.createPaymentSession",
+        "facade.api.checkout.createSetupSession",
+        "facade.api.checkout.createSubscriptionSession",
+        "facade.api.billingPortal.createSession"
+      ],
+      "docs": [
+        "docs/stripe-core-apis.md",
+        "docs/getting-started.md"
+      ],
+      "notes": "Checkout URLs are normalized with stripe_checkout_session_id by default."
+    },
+    {
+      "capability": "metering-tax-connect",
+      "status": "implemented",
+      "solidusApi": [
+        "facade.api.meters.createEvent",
+        "facade.api.connect.createAccount",
+        "facade.api.connect.retrieveAccount",
+        "facade.api.connect.createAccountLink",
+        "facade.api.connect.createLoginLink",
+        "facade.api.connect.createTransfer"
+      ],
+      "docs": [
+        "docs/stripe-core-apis.md",
+        "docs/stripe-connect-parity-checklist.md"
+      ],
+      "notes": "Usage migration and tax mapping caveats remain explicit in docs."
+    },
+    {
+      "capability": "rails-convention-portability",
+      "status": "non-portable",
+      "solidusApi": [],
+      "docs": [
+        "docs/not-portable-from-rails.md"
+      ],
+      "notes": "Rails callback/migration conventions are intentionally not first-party portable in v1 scope."
+    }
+  ]
+}
