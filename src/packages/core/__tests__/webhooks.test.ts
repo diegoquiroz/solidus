@@ -321,20 +321,43 @@ describe("persist-first webhook pipeline", () => {
 
     await drainDbOutboxQueue({ outbox, pipeline, now });
 
-    expect(logs.some((entry) => entry.event === "webhook.ingest.queued" && entry.status === "queued")).toBeTrue();
-    expect(
-      logs.some((entry) => entry.event === "webhook.process.processed" && entry.status === "processed" && entry.lagMs === 125),
-    ).toBeTrue();
+    const queuedLog = logs.find((entry) => entry.event === "webhook.ingest.queued");
+    const processedLog = logs.find((entry) => entry.event === "webhook.process.processed");
 
-    expect(
-      metrics.some((sample) => sample.name === "webhook.process.transition.count" && sample.tags?.status === "processed"),
-    ).toBeTrue();
-    expect(
-      metrics.some(
-        (sample) =>
-          sample.name === "webhook.lag.ms" && sample.value === 125 && sample.unit === "ms" && sample.tags?.status === "processed",
-      ),
-    ).toBeTrue();
+    expect(queuedLog).toBeDefined();
+    expect(queuedLog?.status).toBe("queued");
+    expect(queuedLog?.processor).toBe("stripe");
+    expect(queuedLog?.eventId).toBe("evt_obs");
+    expect(queuedLog?.eventType).toBe("charge.succeeded");
+    expect(queuedLog?.timestamp.getTime()).toBe(2_000);
+
+    expect(processedLog).toBeDefined();
+    expect(processedLog?.status).toBe("processed");
+    expect(processedLog?.processor).toBe("stripe");
+    expect(processedLog?.eventId).toBe("evt_obs");
+    expect(processedLog?.eventType).toBe("charge.succeeded");
+    expect(processedLog?.attemptCount).toBe(0);
+    expect(processedLog?.lagMs).toBe(125);
+    expect(processedLog?.timestamp.getTime()).toBe(2_125);
+
+    const processedTransitionMetric = metrics.find(
+      (sample) => sample.name === "webhook.process.transition.count" && sample.tags?.status === "processed",
+    );
+    const processedLagMetric = metrics.find(
+      (sample) => sample.name === "webhook.lag.ms" && sample.tags?.status === "processed",
+    );
+
+    expect(processedTransitionMetric).toBeDefined();
+    expect(processedTransitionMetric?.unit).toBe("count");
+    expect(processedTransitionMetric?.value).toBe(1);
+    expect(processedTransitionMetric?.tags?.processor).toBe("stripe");
+    expect(processedTransitionMetric?.tags?.eventType).toBe("charge.succeeded");
+
+    expect(processedLagMetric).toBeDefined();
+    expect(processedLagMetric?.value).toBe(125);
+    expect(processedLagMetric?.unit).toBe("ms");
+    expect(processedLagMetric?.tags?.processor).toBe("stripe");
+    expect(processedLagMetric?.tags?.eventType).toBe("charge.succeeded");
   });
 
   test("emits retry and dead-letter lag metrics", async () => {
@@ -393,6 +416,23 @@ describe("persist-first webhook pipeline", () => {
           && sample.unit === "ms",
       ),
     ).toBeTrue();
+
+    const retryTransitionMetric = metrics.find(
+      (sample) => sample.name === "webhook.process.transition.count" && sample.tags?.status === "retrying",
+    );
+    const deadLetterTransitionMetric = metrics.find(
+      (sample) => sample.name === "webhook.process.transition.count" && sample.tags?.status === "dead_letter",
+    );
+
+    expect(retryTransitionMetric?.unit).toBe("count");
+    expect(retryTransitionMetric?.value).toBe(1);
+    expect(retryTransitionMetric?.tags?.processor).toBe("stripe");
+    expect(retryTransitionMetric?.tags?.eventType).toBe("invoice.payment_failed");
+
+    expect(deadLetterTransitionMetric?.unit).toBe("count");
+    expect(deadLetterTransitionMetric?.value).toBe(1);
+    expect(deadLetterTransitionMetric?.tags?.processor).toBe("stripe");
+    expect(deadLetterTransitionMetric?.tags?.eventType).toBe("invoice.payment_failed");
   });
 
   test("computes health diagnostics counts and warnings", async () => {

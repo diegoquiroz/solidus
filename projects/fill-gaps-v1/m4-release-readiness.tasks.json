@@ -14,8 +14,8 @@
         "bun test src/packages/core/__tests__/webhooks.test.ts passes"
       ],
       "priority": 1,
-      "passes": false,
-      "notes": "",
+      "passes": true,
+      "notes": "Updated docs/webhook-operations-runbook.md with replay playbook, dead-letter triage, required observability fields, common failure signatures, and adapter/default behavior notes. Strengthened src/packages/core/__tests__/webhooks.test.ts observability assertions for required log/metric fields and tags. Verified gate: bun test src/packages/core/__tests__/webhooks.test.ts (6 pass, 0 fail).",
       "dependsOn": []
     },
     {
@@ -29,8 +29,8 @@
         "bun run docs:core passes"
       ],
       "priority": 2,
-      "passes": false,
-      "notes": "",
+      "passes": true,
+      "notes": "Updated docs/release-notes-and-upgrade-guide.md with Sequelize/default-effects setup guidance, a v1 pay parity delta table, and known limitations/compatibility notes. Verified gate: bun run docs:core completed successfully.",
       "dependsOn": [
         "US-001"
       ]
@@ -46,8 +46,8 @@
         "bun test passes"
       ],
       "priority": 3,
-      "passes": false,
-      "notes": "",
+      "passes": true,
+      "notes": "Final release-candidate sign-off checklist completed in this milestone file: [1] bun run typecheck passed, [2] bun run lint passed, [3] bun test passed (73 pass, 1 skip, 0 fail), [4] example smoke flow passed via bun run scripts/example-app/smoke.ts and matches documented persist-first + default-effects setup. Validation evidence captured on 2026-02-20.",
       "dependsOn": [
         "US-002"
       ]
