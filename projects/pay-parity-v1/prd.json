@@ -1,0 +1,292 @@
+{
+  "name": "Solidus Pay Parity v1",
+  "branchName": "ralph/pay-parity-v1",
+  "description": "Close all portable Pay Stripe parity gaps for Solidus with a best-in-class DX for Express + Sequelize projects, prioritizing ergonomics, documentation, and Stripe compatibility.",
+  "userStories": [
+    {
+      "id": "US-001",
+      "title": "Integrate customer registration into runtime owner-linking",
+      "description": "As an integrator, I want registerCustomerModel to be used in real flows so owner resolution and checkout linking are first-class.",
+      "acceptanceCriteria": [
+        "Checkout owner-link workflow resolves owners through registered models.",
+        "Unsafe or unknown client reference values fail with explicit typed errors.",
+        "Tests cover valid, missing, malformed, and unknown model reference IDs.",
+        "bun run lint passes",
+        "bun run typecheck passes",
+        "bun test passes"
+      ],
+      "priority": 1,
+      "passes": false,
+      "notes": "",
+      "dependsOn": []
+    },
+    {
+      "id": "US-002",
+      "title": "Add default checkout owner-link effect",
+      "description": "As an integrator, I want Pay-like owner auto-linking behavior by default for checkout completion events.",
+      "acceptanceCriteria": [
+        "checkout.session.completed and checkout.session.async_payment_succeeded support owner-linking default effect.",
+        "Owner link operation is idempotent and safe for replayed events.",
+        "Behavior can be overridden or disabled without forking internals.",
+        "bun run lint passes",
+        "bun run typecheck passes",
+        "bun test passes",
+        "bun run test:integration passes",
+        "bun run test:example-app passes"
+      ],
+      "priority": 2,
+      "passes": false,
+      "notes": "",
+      "dependsOn": [
+        "US-001"
+      ]
+    },
+    {
+      "id": "US-003",
+      "title": "Add default account.updated merchant sync effect",
+      "description": "As a marketplace integrator, I want merchant onboarding status to sync automatically from Stripe account updates.",
+      "acceptanceCriteria": [
+        "Default effects include syncAccountById behavior for account projection updates.",
+        "Connected-account fields needed by facade and core flows are persisted.",
+        "Tests verify onboarding status transitions from webhook payloads.",
+        "bun run lint passes",
+        "bun run typecheck passes",
+        "bun test passes",
+        "bun run test:integration passes",
+        "bun run test:example-app passes"
+      ],
+      "priority": 3,
+      "passes": false,
+      "notes": "",
+      "dependsOn": [
+        "US-002"
+      ]
+    },
+    {
+      "id": "US-004",
+      "title": "Complete Pay-like convenience API surface for Stripe-first workflows",
+      "description": "As an app developer, I want high-level methods for common billing actions with minimal boilerplate.",
+      "acceptanceCriteria": [
+        "Convenience API inventory is parity-reviewed against Pay Stripe customer and subscription ergonomics.",
+        "Missing high-value helpers are implemented or explicitly documented as intentional differences.",
+        "Migration table maps Pay idioms to Solidus convenience methods.",
+        "bun run lint passes",
+        "bun run typecheck passes",
+        "bun test passes"
+      ],
+      "priority": 4,
+      "passes": false,
+      "notes": "",
+      "dependsOn": [
+        "US-001",
+        "US-002",
+        "US-003"
+      ]
+    },
+    {
+      "id": "US-005",
+      "title": "Stripe behavior parity audit and closure",
+      "description": "As a maintainer, I want a deterministic parity matrix so Stripe compatibility claims are test-backed.",
+      "acceptanceCriteria": [
+        "A machine-readable parity matrix maps each Pay Stripe capability to Solidus implementation status.",
+        "Every missing entry has an execution story or explicit defer rationale.",
+        "Matrix is linked from top-level docs.",
+        "bun run lint passes",
+        "bun run typecheck passes",
+        "bun test passes"
+      ],
+      "priority": 5,
+      "passes": false,
+      "notes": "",
+      "dependsOn": [
+        "US-004"
+      ]
+    },
+    {
+      "id": "US-006",
+      "title": "Fill remaining Stripe API helper gaps",
+      "description": "As an integrator, I want Stripe helper coverage that avoids dropping to raw SDK for common Pay-equivalent flows.",
+      "acceptanceCriteria": [
+        "Gap helpers identified in US-005 are implemented with typed APIs.",
+        "Helpers align with existing error taxonomy (ActionRequiredError, ProviderError, and others).",
+        "Integration tests validate helper behavior against Stripe test mode where feasible.",
+        "bun run lint passes",
+        "bun run typecheck passes",
+        "bun test passes",
+        "bun run test:integration passes",
+        "bun run test:example-app passes"
+      ],
+      "priority": 6,
+      "passes": false,
+      "notes": "",
+      "dependsOn": [
+        "US-005"
+      ]
+    },
+    {
+      "id": "US-007",
+      "title": "Preserve parity-critical webhook semantics",
+      "description": "As an operator, I want parity-critical webhook semantics to stay stable during feature additions.",
+      "acceptanceCriteria": [
+        "Subscriber suppression behavior for duplicate-side-effect events remains preserved.",
+        "Required event diagnostics remain accurate.",
+        "Replay behavior remains idempotent across newly added effects.",
+        "bun run lint passes",
+        "bun run typecheck passes",
+        "bun test passes",
+        "bun run test:integration passes",
+        "bun run test:example-app passes"
+      ],
+      "priority": 7,
+      "passes": false,
+      "notes": "",
+      "dependsOn": [
+        "US-006"
+      ]
+    },
+    {
+      "id": "US-008",
+      "title": "Publish canonical Quickstart and Installation docs",
+      "description": "As a first-time user, I want one guide that gets me from zero to first successful charge or subscription with webhooks.",
+      "acceptanceCriteria": [
+        "README links a single canonical quickstart.",
+        "Quickstart includes env vars, Stripe setup, migrations, repository wiring, facade setup, and webhook mount order.",
+        "Quickstart includes expected outputs validation checkpoints.",
+        "bun run lint passes",
+        "bun run typecheck passes",
+        "bun test passes"
+      ],
+      "priority": 8,
+      "passes": false,
+      "notes": "",
+      "dependsOn": [
+        "US-004"
+      ]
+    },
+    {
+      "id": "US-009",
+      "title": "Publish Pay-style usage docs by domain",
+      "description": "As an integrator migrating from Pay, I want dedicated docs for customers, payment methods, charges, subscriptions, and webhooks.",
+      "acceptanceCriteria": [
+        "Docs structure mirrors Pay mental model for discoverability.",
+        "Each domain page includes copy-ready examples and caveats.",
+        "Cross-links cover SCA, checkout, metering, tax, and connect.",
+        "bun run lint passes",
+        "bun run typecheck passes",
+        "bun test passes"
+      ],
+      "priority": 9,
+      "passes": false,
+      "notes": "",
+      "dependsOn": [
+        "US-008"
+      ]
+    },
+    {
+      "id": "US-010",
+      "title": "Publish explicit Not Portable from Rails guide",
+      "description": "As a migrating team, I want clear guidance on what cannot or should not be ported 1:1.",
+      "acceptanceCriteria": [
+        "Guide lists Rails-only features and TS-native alternatives.",
+        "No ambiguous parity claims remain in public docs.",
+        "Guide is referenced from README, migration docs, and release notes.",
+        "bun run lint passes",
+        "bun run typecheck passes",
+        "bun test passes"
+      ],
+      "priority": 10,
+      "passes": false,
+      "notes": "",
+      "dependsOn": [
+        "US-009"
+      ]
+    },
+    {
+      "id": "US-011",
+      "title": "Publish Sequelize and Express production hardening guide",
+      "description": "As an on-call owner, I want operational docs tailored to the supported stack.",
+      "acceptanceCriteria": [
+        "Guide covers deployment topology, worker setup, retries, replay, dead-letter triage, and secret rotation.",
+        "Guide includes live or test mode policy recommendations for production.",
+        "Guide includes rollback toggles and incident checklists.",
+        "bun run lint passes",
+        "bun run typecheck passes",
+        "bun test passes"
+      ],
+      "priority": 11,
+      "passes": false,
+      "notes": "",
+      "dependsOn": [
+        "US-008",
+        "US-009"
+      ]
+    },
+    {
+      "id": "US-012",
+      "title": "Provide first-party Sequelize reference implementation path",
+      "description": "As an integrator, I want a default repository and model implementation path that works out of the box.",
+      "acceptanceCriteria": [
+        "Solidus provides a documented default implementation path, not only delegate wrappers.",
+        "Setup does not require writing boilerplate delegates for common use cases.",
+        "Tests validate the default path end-to-end.",
+        "bun run lint passes",
+        "bun run typecheck passes",
+        "bun test passes",
+        "bun run test:integration passes",
+        "bun run test:example-app passes"
+      ],
+      "priority": 12,
+      "passes": false,
+      "notes": "",
+      "dependsOn": [
+        "US-003",
+        "US-011"
+      ]
+    },
+    {
+      "id": "US-013",
+      "title": "Expand example app to parity scenarios",
+      "description": "As a user evaluating adoption, I want an executable reference app covering key Pay-style flows.",
+      "acceptanceCriteria": [
+        "Example app covers processor assignment, checkout, SCA action-required, subscription lifecycle, and webhook replay.",
+        "Example docs explain expected state transitions in projections.",
+        "Example scripts run in CI.",
+        "bun run lint passes",
+        "bun run typecheck passes",
+        "bun test passes",
+        "bun run test:integration passes",
+        "bun run test:example-app passes"
+      ],
+      "priority": 13,
+      "passes": false,
+      "notes": "",
+      "dependsOn": [
+        "US-012"
+      ]
+    },
+    {
+      "id": "US-014",
+      "title": "Parity acceptance suite and sign-off",
+      "description": "As a maintainer, I want objective sign-off criteria that confirm parity completion.",
+      "acceptanceCriteria": [
+        "Release checklist includes all parity matrix entries.",
+        "All parity stories pass quality gates and integration suites.",
+        "Remaining differences are documented as intentional or non-portable.",
+        "bun run lint passes",
+        "bun run typecheck passes",
+        "bun test passes",
+        "bun run test:integration passes",
+        "bun run test:example-app passes",
+        "bun run test:runtime passes"
+      ],
+      "priority": 14,
+      "passes": false,
+      "notes": "",
+      "dependsOn": [
+        "US-007",
+        "US-010",
+        "US-013"
+      ]
+    }
+  ]
+}
