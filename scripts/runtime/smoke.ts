@@ -1,8 +1,8 @@
 import {
   createCustomerRegistry,
   createFacadePlaceholder,
-  createSequelizeAdapterPlaceholder,
   diagnoseStripeWebhookEvents,
+  m1FoundationSchema,
 } from "../../index.ts";
 
 function assert(condition: unknown, message: string): void {
@@ -23,10 +23,9 @@ assert(
 const facade = createFacadePlaceholder();
 assert(facade.package === "facade", "createFacadePlaceholder should expose facade package.");
 
-const sequelize = createSequelizeAdapterPlaceholder();
 assert(
-  sequelize.orm === "sequelize",
-  "createSequelizeAdapterPlaceholder should expose sequelize adapter metadata.",
+  m1FoundationSchema.tables.customers !== undefined,
+  "m1FoundationSchema should expose sequelize schema metadata.",
 );
 
 console.log("Runtime smoke checks passed.");

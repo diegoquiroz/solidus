@@ -15,16 +15,20 @@ describe("m1 foundation schema artifacts", () => {
     expect(Object.keys(m1FoundationSchema.tables).sort()).toEqual([
       "charges",
       "customers",
+      "invoices",
       "merchants",
       "payment_methods",
       "subscriptions",
+      "webhook_outbox",
       "webhooks"
     ]);
   });
 
   test("documents required uniqueness semantics", () => {
     const customers = m1FoundationSchema.tables.customers!;
+    const invoices = m1FoundationSchema.tables.invoices!;
     const paymentMethods = m1FoundationSchema.tables.payment_methods!;
+    const outbox = m1FoundationSchema.tables.webhook_outbox!;
     const webhooks = m1FoundationSchema.tables.webhooks!;
 
     expect(customers.indexes).toContain(
@@ -36,9 +40,39 @@ describe("m1 foundation schema artifacts", () => {
     expect(paymentMethods.indexes).toContain(
       "UNIQUE (customer_id) WHERE is_default"
     );
+    expect(invoices.indexes).toContain(
+      "UNIQUE (processor, processor_id)"
+    );
     expect(webhooks.indexes).toContain(
       "UNIQUE (processor, event_id)"
     );
+    expect(outbox.indexes).toContain(
+      "UNIQUE (job_idempotency_key) WHERE job_idempotency_key IS NOT NULL"
+    );
+  });
+
+  test("includes webhook lifecycle and invoice projection columns", () => {
+    const subscriptions = m1FoundationSchema.tables.subscriptions!;
+    const charges = m1FoundationSchema.tables.charges!;
+    const paymentMethods = m1FoundationSchema.tables.payment_methods!;
+    const invoices = m1FoundationSchema.tables.invoices!;
+    const webhooks = m1FoundationSchema.tables.webhooks!;
+
+    expect(subscriptions.columns).toHaveProperty("price_id");
+    expect(subscriptions.columns).toHaveProperty("cancel_at_period_end");
+    expect(subscriptions.columns).toHaveProperty("raw_payload");
+    expect(charges.columns).toHaveProperty("receipt_url");
+    expect(charges.columns).toHaveProperty("payment_method_snapshot");
+    expect(charges.columns).toHaveProperty("raw_payload");
+    expect(paymentMethods.columns).toHaveProperty("exp_month");
+    expect(paymentMethods.columns).toHaveProperty("exp_year");
+    expect(paymentMethods.columns).toHaveProperty("raw_payload");
+    expect(invoices.columns).toHaveProperty("customer_processor_id");
+    expect(invoices.columns).toHaveProperty("subscription_processor_id");
+    expect(invoices.columns).toHaveProperty("raw_payload");
+    expect(webhooks.columns).toHaveProperty("attempt_count");
+    expect(webhooks.columns).toHaveProperty("next_attempt_at");
+    expect(webhooks.columns).toHaveProperty("dead_lettered_at");
   });
 });
 
@@ -51,7 +85,9 @@ describe("m1 SQL migration templates", () => {
       "customers",
       "subscriptions",
       "charges",
+      "invoices",
       "payment_methods",
+      "webhook_outbox",
       "webhooks"
     ]) {
       expect(sql).toMatch(new RegExp(`CREATE TABLE ${tableName} \\(`));
@@ -85,12 +121,34 @@ describe("m1 SQL migration templates", () => {
     expect(sql).toMatch(
       /CREATE UNIQUE INDEX ux_webhooks_processor_event_id\s+ON webhooks \(processor, event_id\);/
     );
+    expect(sql).toMatch(
+      /CREATE UNIQUE INDEX ux_invoices_processor_processor_id\s+ON invoices \(processor, processor_id\);/
+    );
+    expect(sql).toMatch(
+      /CREATE UNIQUE INDEX ux_webhook_outbox_job_idempotency_key\s+ON webhook_outbox \(job_idempotency_key\)\s+WHERE job_idempotency_key IS NOT NULL;/
+    );
+  });
+
+  test("up migration includes webhook lifecycle and projection columns", async () => {
+    const sql = await readProjectFile(upMigrationPath);
+
+    expect(sql).toContain("attempt_count INTEGER NOT NULL DEFAULT 0");
+    expect(sql).toContain("next_attempt_at TIMESTAMPTZ");
+    expect(sql).toContain("dead_lettered_at TIMESTAMPTZ");
+    expect(sql).toContain("customer_processor_id TEXT NOT NULL");
+    expect(sql).toContain("raw_payload JSONB NOT NULL");
+    expect(sql).toContain("CREATE TABLE invoices (");
+    expect(sql).toContain("subscription_processor_id TEXT");
+    expect(sql).toContain("CREATE TABLE webhook_outbox (");
+    expect(sql).toContain("job_payload JSONB NOT NULL");
   });
 
   test("down migration drops tables and indexes", async () => {
     const sql = await readProjectFile(downMigrationPath);
 
     expect(sql).toContain("DROP TABLE IF EXISTS webhooks;");
+    expect(sql).toContain("DROP TABLE IF EXISTS webhook_outbox;");
+    expect(sql).toContain("DROP TABLE IF EXISTS invoices;");
     expect(sql).toContain("DROP TABLE IF EXISTS payment_methods;");
     expect(sql).toContain("DROP TABLE IF EXISTS charges;");
     expect(sql).toContain("DROP TABLE IF EXISTS subscriptions;");
