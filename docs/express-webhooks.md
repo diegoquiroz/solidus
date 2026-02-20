@@ -9,6 +9,7 @@ import express from "express";
 import Stripe from "stripe";
 import {
   createDbOutboxQueueAdapter,
+  getWebhookHealthDiagnostics,
   createPersistFirstWebhookPipeline,
   createStripeWebhookHandlers,
   createStripeWebhookProcessor,
@@ -35,6 +36,14 @@ const pipeline = createPersistFirstWebhookPipeline({
   processEvent: async (event) => {
     await processor.process(event.payload as Stripe.Event);
   },
+  observability: {
+    log(entry) {
+      console.log(JSON.stringify(entry));
+    },
+    metric(sample) {
+      metricsClient.observe(sample.name, sample.value, sample.tags);
+    },
+  },
 });
 
 app.use(
@@ -49,6 +58,15 @@ app.use(
 );
 
 app.use(express.json());
+
+const diagnostics = await getWebhookHealthDiagnostics({
+  listEvents: () => webhookRepository.listRecent(),
+  lagWarningThresholdMs: 120000,
+});
+
+if (diagnostics.warnings.length > 0) {
+  console.warn("webhook health warning", diagnostics);
+}
 ```
 
 ## Middleware ordering
@@ -63,3 +81,10 @@ app.use(express.json());
 - Empty webhook secret config returns `400` with `CONFIGURATION_ERROR`.
 - Parsed body (non-raw payload) returns `400` with a route-ordering hint.
 - Multiple secrets are supported for zero-downtime secret rotation.
+
+## Observability and operations
+
+- `observability.log` receives structured transition logs for ingest and process events.
+- `observability.metric` receives callback-based metric samples (`count` and lag `ms`).
+- Lag metric name is `webhook.lag.ms` with `status` tags (`processed`, `retrying`, `dead_letter`).
+- Use `getWebhookHealthDiagnostics` to build `/health/webhooks` checks with pending/retrying/dead-letter counts.

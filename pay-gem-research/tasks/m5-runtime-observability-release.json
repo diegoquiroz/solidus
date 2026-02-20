@@ -19,8 +19,8 @@
         "pnpm test:integration passes"
       ],
       "priority": 1,
-      "passes": false,
-      "notes": "",
+      "passes": true,
+      "notes": "Added runtime matrix scripts in package.json, runtime smoke suite in scripts/runtime/smoke.ts, and CI workflow in .github/workflows/runtime-matrix.yml. Isolated webhook payload runtime conversion into src/packages/stripe/runtime-payload.ts and updated verifier in src/packages/stripe/webhooks.ts with coverage in src/packages/stripe/__tests__/webhooks.test.ts. Published compatibility table and caveats in docs/runtime-compatibility.md and linked from README.md.",
       "dependsOn": []
     },
     {
@@ -39,8 +39,8 @@
         "pnpm test:integration passes"
       ],
       "priority": 2,
-      "passes": false,
-      "notes": "",
+      "passes": true,
+      "notes": "Implemented optional structured observability hooks in src/packages/core/webhooks.ts for logs and metrics, including webhook lag metric (webhook.lag.ms) across processed/retrying/dead-letter transitions. Added health diagnostics helper getWebhookHealthDiagnostics with pending/retrying/dead-letter counts and lag warnings, plus smoke coverage in src/packages/core/__tests__/webhooks.test.ts. Expanded operations docs in docs/express-webhooks.md and docs/webhook-operations-runbook.md, including secret-rotation and outage handling guidance.",
       "dependsOn": [
         "US-001"
       ]
@@ -62,7 +62,7 @@
       ],
       "priority": 3,
       "passes": false,
-      "notes": "",
+      "notes": "Implemented US-003 preparation without publishing a release: finalized facade entrypoint with createSolidusFacade in src/packages/facade/index.ts and coverage in src/packages/facade/__tests__/index.test.ts, added migration guide in docs/migration-from-ad-hoc-stripe.md, added manual release runbook/versioning policy in docs/release-manual.md and release-notes template in docs/release-notes-and-upgrade-guide.md, and added example app CI workflow in .github/workflows/example-app.yml with smoke script scripts/example-app/smoke.ts. Remaining manual step: publish first stable release candidate when explicitly approved.",
       "dependsOn": [
         "US-001",
         "US-002"

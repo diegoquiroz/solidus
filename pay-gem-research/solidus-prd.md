@@ -227,24 +227,25 @@ Security/reliability gates:
     - [x] Definition of Done: Connect feature parity checklist signed off.
 
 - [ ] **Milestone M5: Runtime Compatibility, Observability, and Release**
-  - [ ] **Task M5-T1: Node/Bun/Deno compatibility hardening**
-    - [ ] Add runtime CI matrix.
-    - [ ] Isolate Node-specific code paths in adapters.
-    - [ ] Publish compatibility caveats and supported versions.
-    - [ ] Verification: Runtime matrix tests green.
-    - [ ] Definition of Done: Compatibility table in docs published.
-  - [ ] **Task M5-T2: Observability and operations**
-    - [ ] Add structured logging and metric hooks.
-    - [ ] Add health diagnostics and webhook lag metrics.
-    - [ ] Add runbooks for secret rotation and outage handling.
-    - [ ] Verification: Smoke tests for emitted metrics/log fields.
-    - [ ] Definition of Done: Operations section included in docs.
+  - [x] **Task M5-T1: Node/Bun/Deno compatibility hardening**
+    - [x] Add runtime CI matrix.
+    - [x] Isolate Node-specific code paths in adapters.
+    - [x] Publish compatibility caveats and supported versions.
+    - [x] Verification: Runtime matrix tests green.
+    - [x] Definition of Done: Compatibility table in docs published.
+  - [x] **Task M5-T2: Observability and operations**
+    - [x] Add structured logging and metric hooks.
+    - [x] Add health diagnostics and webhook lag metrics.
+    - [x] Add runbooks for secret rotation and outage handling.
+    - [x] Verification: Smoke tests for emitted metrics/log fields.
+    - [x] Definition of Done: Operations section included in docs.
   - [ ] **Task M5-T3: Packaging and release process**
-    - [ ] Finalize facade package APIs and versioning policy.
-    - [ ] Ship migration guide from ad hoc Stripe integrations.
+    - [x] Finalize facade package APIs and versioning policy.
+    - [x] Ship migration guide from ad hoc Stripe integrations.
     - [ ] Publish first stable release candidate.
-    - [ ] Verification: End-to-end example app in CI.
-    - [ ] Definition of Done: Release notes and upgrade guide published.
+    - [x] Verification: End-to-end example app in CI.
+    - [x] Definition of Done: Release notes and upgrade guide published.
+    - [ ] Manual publish intentionally deferred; follow `docs/release-manual.md` when ready.
 
 ## 11. Dependencies
 

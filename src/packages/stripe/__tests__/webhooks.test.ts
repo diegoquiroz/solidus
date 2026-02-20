@@ -5,7 +5,9 @@ import {
   createStripeWebhookHandlers,
   createStripeWebhookProcessor,
   requiredStripeWebhookEvents,
+  verifyStripeWebhookEvent,
 } from "../webhooks.ts";
+import { toStripeWebhookPayload } from "../runtime-payload.ts";
 
 function makeEvent(type: string, object: Record<string, unknown>): Stripe.Event {
   return {
@@ -84,5 +86,30 @@ describe("stripe webhook handlers", () => {
     );
 
     expect(calls).toEqual(["sync:pi_123"]);
+  });
+
+  test("converts Uint8Array payloads into UTF-8 strings", async () => {
+    const payloads: string[] = [];
+    const stripe = {
+      webhooks: {
+        async constructEventAsync(payload: string): Promise<Stripe.Event> {
+          payloads.push(payload);
+          return makeEvent("charge.succeeded", { id: "ch_123" });
+        },
+      },
+    } as unknown as Stripe;
+
+    await verifyStripeWebhookEvent({
+      stripe,
+      payload: new Uint8Array([123, 34, 111, 107, 34, 58, 116, 114, 117, 101, 125]),
+      signatureHeader: "t=1,v1=signed",
+      webhookSecrets: ["whsec_test"],
+    });
+
+    expect(payloads).toEqual(['{"ok":true}']);
+  });
+
+  test("keeps string payloads unchanged", () => {
+    expect(toStripeWebhookPayload('{"status":"ok"}')).toBe('{"status":"ok"}');
   });
 });

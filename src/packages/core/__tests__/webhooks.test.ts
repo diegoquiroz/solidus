@@ -7,6 +7,9 @@ import {
   type DbOutboxQueueRecord,
   type DbOutboxRepository,
   type PersistedWebhookEvent,
+  getWebhookHealthDiagnostics,
+  type WebhookLogEntry,
+  type WebhookMetricSample,
   type WebhookEventRepository,
 } from "../webhooks.ts";
 
@@ -278,5 +281,173 @@ describe("persist-first webhook pipeline", () => {
 
     expect(deadLettered?.deadLetteredAt?.getTime()).toBe(5_050);
     expect(deadLettered?.attemptCount).toBe(2);
+  });
+
+  test("emits structured logs and metrics with transition fields", async () => {
+    let unixTime = 2_000;
+    const now = () => new Date(unixTime);
+    const idempotencyRepository = new InMemoryIdempotencyRepository();
+    const eventRepository = new InMemoryWebhookEventRepository();
+    const outbox = new InMemoryDbOutboxRepository();
+    const queue = createDbOutboxQueueAdapter({ outbox, now });
+    const logs: WebhookLogEntry[] = [];
+    const metrics: WebhookMetricSample[] = [];
+
+    const pipeline = createPersistFirstWebhookPipeline({
+      idempotencyRepository,
+      eventRepository,
+      queue,
+      now,
+      processEvent: async () => {
+        unixTime = 2_125;
+      },
+      observability: {
+        log(entry) {
+          logs.push(entry);
+        },
+        metric(sample) {
+          metrics.push(sample);
+        },
+      },
+    });
+
+    await pipeline.ingest({
+      processor: "stripe",
+      eventId: "evt_obs",
+      eventType: "charge.succeeded",
+      payload: {},
+      receivedAt: new Date(2_000),
+    });
+
+    await drainDbOutboxQueue({ outbox, pipeline, now });
+
+    expect(logs.some((entry) => entry.event === "webhook.ingest.queued" && entry.status === "queued")).toBeTrue();
+    expect(
+      logs.some((entry) => entry.event === "webhook.process.processed" && entry.status === "processed" && entry.lagMs === 125),
+    ).toBeTrue();
+
+    expect(
+      metrics.some((sample) => sample.name === "webhook.process.transition.count" && sample.tags?.status === "processed"),
+    ).toBeTrue();
+    expect(
+      metrics.some(
+        (sample) =>
+          sample.name === "webhook.lag.ms" && sample.value === 125 && sample.unit === "ms" && sample.tags?.status === "processed",
+      ),
+    ).toBeTrue();
+  });
+
+  test("emits retry and dead-letter lag metrics", async () => {
+    let unixTime = 10_000;
+    const now = () => new Date(unixTime);
+    const idempotencyRepository = new InMemoryIdempotencyRepository();
+    const eventRepository = new InMemoryWebhookEventRepository();
+    const outbox = new InMemoryDbOutboxRepository();
+    const queue = createDbOutboxQueueAdapter({ outbox, now });
+    const metrics: WebhookMetricSample[] = [];
+
+    const pipeline = createPersistFirstWebhookPipeline({
+      idempotencyRepository,
+      eventRepository,
+      queue,
+      now,
+      retryPolicy: {
+        maxAttempts: 2,
+        baseDelayMs: 100,
+      },
+      processEvent: async () => {
+        throw new Error("failing");
+      },
+      observability: {
+        metric(sample) {
+          metrics.push(sample);
+        },
+      },
+    });
+
+    await pipeline.ingest({
+      processor: "stripe",
+      eventId: "evt_obs_fail",
+      eventType: "invoice.payment_failed",
+      payload: {},
+      receivedAt: new Date(10_000),
+    });
+
+    unixTime = 10_020;
+    await drainDbOutboxQueue({ outbox, pipeline, now });
+    unixTime = 10_150;
+    await drainDbOutboxQueue({ outbox, pipeline, now });
+
+    expect(
+      metrics.some(
+        (sample) =>
+          sample.name === "webhook.lag.ms" && sample.tags?.status === "retrying" && sample.value === 20 && sample.unit === "ms",
+      ),
+    ).toBeTrue();
+    expect(
+      metrics.some(
+        (sample) =>
+          sample.name === "webhook.lag.ms"
+          && sample.tags?.status === "dead_letter"
+          && sample.value === 150
+          && sample.unit === "ms",
+      ),
+    ).toBeTrue();
+  });
+
+  test("computes health diagnostics counts and warnings", async () => {
+    const diagnostics = await getWebhookHealthDiagnostics({
+      now: () => new Date(10_000),
+      lagWarningThresholdMs: 2_000,
+      deadLetterWarningThreshold: 1,
+      listEvents: async () => [
+        {
+          id: "1",
+          processor: "stripe",
+          eventId: "evt_pending",
+          eventType: "charge.succeeded",
+          payload: {},
+          attemptCount: 0,
+          receivedAt: new Date(9_000),
+        },
+        {
+          id: "2",
+          processor: "stripe",
+          eventId: "evt_retry",
+          eventType: "invoice.payment_failed",
+          payload: {},
+          attemptCount: 2,
+          receivedAt: new Date(7_000),
+          nextAttemptAt: new Date(10_500),
+        },
+        {
+          id: "3",
+          processor: "stripe",
+          eventId: "evt_dead",
+          eventType: "customer.deleted",
+          payload: {},
+          attemptCount: 5,
+          receivedAt: new Date(6_000),
+          deadLetteredAt: new Date(9_500),
+          lastError: "boom",
+        },
+        {
+          id: "4",
+          processor: "stripe",
+          eventId: "evt_done",
+          eventType: "charge.succeeded",
+          payload: {},
+          attemptCount: 1,
+          receivedAt: new Date(5_000),
+          processedAt: new Date(5_010),
+        },
+      ],
+    });
+
+    expect(diagnostics.pendingCount).toBe(1);
+    expect(diagnostics.retryingCount).toBe(1);
+    expect(diagnostics.deadLetterCount).toBe(1);
+    expect(diagnostics.oldestLagMs).toBe(3_000);
+    expect(diagnostics.warnings).toEqual(["LAG_THRESHOLD_EXCEEDED", "DEAD_LETTER_THRESHOLD_EXCEEDED"]);
   });
 });

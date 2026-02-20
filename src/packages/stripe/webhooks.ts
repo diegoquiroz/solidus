@@ -1,5 +1,6 @@
 import Stripe from "stripe";
 import { ConfigurationError, SignatureVerificationError } from "../core/errors.ts";
+import { toStripeWebhookPayload } from "./runtime-payload.ts";
 
 const stripeNamespace = "stripe";
 
@@ -116,8 +117,7 @@ export async function verifyStripeWebhookEvent(input: {
     );
   }
 
-  const payload =
-    typeof input.payload === "string" ? input.payload : Buffer.from(input.payload);
+  const payload = toStripeWebhookPayload(input.payload);
 
   let lastError: unknown;
 

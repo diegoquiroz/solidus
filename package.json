@@ -5,6 +5,11 @@
   "scripts": {
     "test": "bun test",
     "test:integration": "bun test",
+    "test:runtime:node": "node --experimental-strip-types scripts/runtime/smoke.ts",
+    "test:runtime:bun": "bun run scripts/runtime/smoke.ts",
+    "test:runtime:deno": "deno run --allow-read --node-modules-dir=auto scripts/runtime/smoke.ts",
+    "test:runtime": "bun run test:runtime:node && bun run test:runtime:bun && bun run test:runtime:deno",
+    "test:example-app": "bun run scripts/example-app/smoke.ts",
     "typecheck": "bunx tsc --noEmit",
     "lint": "bunx tsc --noEmit",
     "docs:core": "bun run scripts/generate-core-api-docs.ts"
