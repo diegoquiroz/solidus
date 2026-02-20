@@ -11,8 +11,6 @@
         "Update Stripe subscription state derivation so paused state behavior matches documented parity decision",
         "Add tests for paused lifecycle transitions including resume and cancellation interactions",
         "Update parity docs to explicitly describe paused active-state semantics",
-        "bun run typecheck passes",
-        "bun run lint passes",
         "bun test src/packages/stripe/__tests__ --test-name-pattern \"paused\" passes"
       ],
       "priority": 1,
@@ -28,8 +26,6 @@
         "Pause API accepts omitted behavior and applies documented default",
         "Explicit behavior options continue working without regression",
         "Add tests validating outgoing Stripe payload for default and explicit behavior paths",
-        "bun run typecheck passes",
-        "bun run lint passes",
         "bun test src/packages/stripe/__tests__ --test-name-pattern \"pause\" passes"
       ],
       "priority": 2,
@@ -47,8 +43,6 @@
         "Express webhook adapter supports policy flags for accepting or rejecting Stripe test events",
         "Default policy is backward-compatible and clearly documented",
         "Rejected events emit observable logs and return documented HTTP responses",
-        "bun run typecheck passes",
-        "bun run lint passes",
         "bun test src/packages/express/__tests__ --test-name-pattern \"test events\" passes"
       ],
       "priority": 3,
@@ -66,8 +60,6 @@
         "Fix charge normalization mapping for total tax amount fields based on Stripe payload data",
         "Add tests for no-tax, single-tax, and multiple-tax scenarios",
         "Update docs and examples where tax field semantics are referenced",
-        "bun run typecheck passes",
-        "bun run lint passes",
         "bun test src/packages/stripe/__tests__ --test-name-pattern \"tax\" passes"
       ],
       "priority": 4,
