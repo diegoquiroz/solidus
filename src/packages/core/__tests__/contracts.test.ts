@@ -31,6 +31,12 @@ class FakeCustomerRepository implements CustomerRepository {
       ) ?? null
     );
   }
+
+  async findByProcessor(input: { processor: string; processorId: string }): Promise<CustomerRecord | null> {
+    return this.customers.find(
+      (customer) => customer.processor === input.processor && customer.processorId === input.processorId,
+    ) ?? null;
+  }
 }
 
 class FakeIdempotencyRepository implements IdempotencyRepository {

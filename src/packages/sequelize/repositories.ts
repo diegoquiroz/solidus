@@ -52,7 +52,7 @@ export interface SequelizeCustomerDelegate {
     ownerId: string;
     processor?: string;
   }): Promise<CustomerRecord | null>;
-  findByProcessor?(input: {
+  findByProcessor(input: {
     processor: string;
     processorId: string;
   }): Promise<CustomerRecord | null>;
@@ -65,6 +65,7 @@ export interface SequelizeIdempotencyDelegate {
 
 export interface SequelizeStripeCustomerProjectionDelegate {
   upsert(customer: StripeCustomerProjection): Promise<void>;
+  findByProcessorId(processorId: string): Promise<StripeCustomerProjection | null>;
 }
 
 export interface SequelizeStripeAccountProjectionDelegate {
@@ -76,6 +77,7 @@ export interface SequelizePaymentMethodDelegate {
   upsert(paymentMethod: PaymentMethodRecord): Promise<void>;
   clearDefaultForCustomer(customerProcessorId: string): Promise<void>;
   deleteByProcessorId(processorId: string): Promise<void>;
+  findByProcessorId(processorId: string): Promise<PaymentMethodRecord | null>;
   listByCustomer(customerProcessorId: string): Promise<readonly PaymentMethodRecord[]>;
 }
 
@@ -301,6 +303,17 @@ export function createSequelizeDelegatesFromModels(models: SequelizeReferenceMod
           "upsert",
         )(customer as unknown as Record<string, unknown>);
       },
+      async findByProcessorId(processorId) {
+        const row = await requireModelMethod<
+          (input: { where: Record<string, unknown> }) => Promise<unknown | null>
+        >(models.stripeCustomers, "findOne")({
+          where: {
+            processorId,
+          },
+        });
+
+        return row === null ? null : asPlainRecord<StripeCustomerProjection>(row);
+      },
     },
     stripeAccounts: models.stripeAccounts === undefined
       ? undefined
@@ -349,6 +362,17 @@ export function createSequelizeDelegatesFromModels(models: SequelizeReferenceMod
             processorId,
           },
         });
+      },
+      async findByProcessorId(processorId) {
+        const row = await requireModelMethod<
+          (input: { where: Record<string, unknown> }) => Promise<unknown | null>
+        >(models.paymentMethods, "findOne")({
+          where: {
+            processorId,
+          },
+        });
+
+        return row === null ? null : asPlainRecord<PaymentMethodRecord>(row);
       },
       async listByCustomer(customerProcessorId) {
         const rows = await requireModelMethod<
@@ -580,7 +604,7 @@ export class SequelizeCustomerRepository implements CustomerRepository {
     processor: string;
     processorId: string;
   }): Promise<CustomerRecord | null> {
-    return this.delegate.findByProcessor?.(input) ?? null;
+    return this.delegate.findByProcessor(input);
   }
 }
 
@@ -609,6 +633,10 @@ export class SequelizeStripeCustomerProjectionRepository implements StripeCustom
 
   async upsert(customer: StripeCustomerProjection): Promise<void> {
     await this.delegate.upsert(customer);
+  }
+
+  async findByProcessorId(processorId: string): Promise<StripeCustomerProjection | null> {
+    return this.delegate.findByProcessorId(processorId);
   }
 }
 
@@ -645,6 +673,10 @@ export class SequelizePaymentMethodRepository implements PaymentMethodRepository
 
   async deleteByProcessorId(processorId: string): Promise<void> {
     await this.delegate.deleteByProcessorId(processorId);
+  }
+
+  async findByProcessorId(processorId: string): Promise<PaymentMethodRecord | null> {
+    return this.delegate.findByProcessorId(processorId);
   }
 
   async listByCustomer(customerProcessorId: string): Promise<readonly PaymentMethodRecord[]> {

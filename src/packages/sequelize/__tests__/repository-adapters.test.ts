@@ -49,6 +49,15 @@ describe("sequelize customer repository", () => {
 
         return null;
       },
+      async findByProcessor(input) {
+        for (const value of rows.values()) {
+          if (value.processor === input.processor && value.processorId === input.processorId) {
+            return value;
+          }
+        }
+
+        return null;
+      },
     });
 
     await repository.save({
@@ -118,6 +127,9 @@ describe("sequelize projection repositories", () => {
       },
       async deleteByProcessorId(processorId) {
         rows.delete(processorId);
+      },
+      async findByProcessorId(processorId) {
+        return rows.get(processorId) ?? null;
       },
       async listByCustomer(customerProcessorId) {
         return Array.from(rows.values()).filter((row) => row.customerProcessorId === customerProcessorId);
@@ -865,6 +877,15 @@ describe("sequelize repository bundle", () => {
 
           return null;
         },
+        async findByProcessor(input) {
+          for (const value of customers.values()) {
+            if (value.processor === input.processor && value.processorId === input.processorId) {
+              return value;
+            }
+          }
+
+          return null;
+        },
       },
       idempotency: {
         async reserve() {
@@ -877,6 +898,9 @@ describe("sequelize repository bundle", () => {
       stripeCustomers: {
         async upsert() {
           return;
+        },
+        async findByProcessorId() {
+          return null;
         },
       },
       stripeAccounts: {
@@ -893,6 +917,9 @@ describe("sequelize repository bundle", () => {
         },
         async deleteByProcessorId() {
           return;
+        },
+        async findByProcessorId() {
+          return null;
         },
         async listByCustomer() {
           return [];

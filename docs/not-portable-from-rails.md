@@ -26,8 +26,8 @@ This document calls out Pay-on-Rails behaviors that are intentionally not first-
 - Keep legacy code path toggles until projection parity is verified.
 - Use the canonical quickstart as the integration baseline: `docs/getting-started.md`.
 - Use domain docs for replacement flows:
-  - `docs/pay-customers.md`
-  - `docs/pay-payment-methods.md`
-  - `docs/pay-charges.md`
-  - `docs/pay-subscriptions.md`
-  - `docs/pay-webhooks.md`
+  - `docs/3_customers.md`
+  - `docs/4_payment_methods.md`
+  - `docs/5_charges.md`
+  - `docs/6_subscriptions.md`
+  - `docs/7_webhooks.md`

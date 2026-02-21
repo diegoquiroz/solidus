@@ -13,11 +13,11 @@ Matrix source of truth: `docs/pay-stripe-parity-matrix.json` (version `2026-02-2
 
 ## Parity matrix entry coverage
 
-- [ ] `customers.create-update-reconcile` (`implemented`) -> `docs/pay-customers.md`, `docs/stripe-core-apis.md`
-- [ ] `payment-methods.attach-default-detach` (`implemented`) -> `docs/pay-payment-methods.md`, `docs/stripe-core-apis.md`
-- [ ] `charges-authorize-capture-refund` (`implemented`) -> `docs/pay-charges.md`, `docs/stripe-core-apis.md`
-- [ ] `subscriptions-lifecycle-and-state` (`implemented`) -> `docs/pay-subscriptions.md`, `docs/stripe-core-apis.md`
-- [ ] `webhooks-default-effects-and-owner-linking` (`implemented`) -> `docs/pay-webhooks.md`, `docs/express-webhooks.md`, `docs/stripe-webhook-coverage-matrix.md`
+- [ ] `customers.create-update-reconcile` (`implemented`) -> `docs/3_customers.md`, `docs/stripe-core-apis.md`
+- [ ] `payment-methods.attach-default-detach` (`implemented`) -> `docs/4_payment_methods.md`, `docs/stripe-core-apis.md`
+- [ ] `charges-authorize-capture-refund` (`implemented`) -> `docs/5_charges.md`, `docs/stripe-core-apis.md`
+- [ ] `subscriptions-lifecycle-and-state` (`implemented`) -> `docs/6_subscriptions.md`, `docs/stripe-core-apis.md`
+- [ ] `webhooks-default-effects-and-owner-linking` (`implemented`) -> `docs/7_webhooks.md`, `docs/express-webhooks.md`, `docs/stripe-webhook-coverage-matrix.md`
 - [ ] `checkout-and-billing-portal` (`implemented`) -> `docs/stripe-core-apis.md`, `docs/getting-started.md`
 - [ ] `metering-tax-connect` (`implemented`) -> `docs/stripe-core-apis.md`, `docs/stripe-connect-parity-checklist.md`
 - [ ] `rails-convention-portability` (`non-portable`) -> `docs/not-portable-from-rails.md`

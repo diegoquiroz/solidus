@@ -30,6 +30,16 @@ class InMemoryOwnerCustomerRepository implements CustomerRepository {
 
     return null;
   }
+
+  async findByProcessor(input: { processor: string; processorId: string }): Promise<CustomerRecord | null> {
+    for (const customer of this.values.values()) {
+      if (customer.processor === input.processor && customer.processorId === input.processorId) {
+        return customer;
+      }
+    }
+
+    return null;
+  }
 }
 
 function makeEvent(type: string, id: string): Stripe.Event {
@@ -82,6 +92,9 @@ describe("facade package", () => {
           async upsert(customer) {
             customers.set(customer.processorId, customer);
           },
+          async findByProcessorId(processorId) {
+            return customers.get(processorId) ?? null;
+          },
         },
       },
       webhookRegistration: {
@@ -102,6 +115,16 @@ describe("facade package", () => {
 
   test("propagates Stripe connected account context through default effects", async () => {
     const customers = new Map<string, StripeCustomerProjection>();
+    customers.set("cus_1", {
+      processor: "stripe",
+      processorId: "cus_1",
+      rawPayload: {
+        id: "cus_1",
+        object: "customer",
+        metadata: {},
+        invoice_settings: {},
+      } as unknown as Stripe.Customer,
+    });
     let seenRequestOptions: Stripe.RequestOptions | undefined;
 
     const stripe = {
@@ -124,6 +147,9 @@ describe("facade package", () => {
         customers: {
           async upsert(customer) {
             customers.set(customer.processorId, customer);
+          },
+          async findByProcessorId(processorId) {
+            return customers.get(processorId) ?? null;
           },
         },
       },
@@ -308,6 +334,7 @@ describe("facade package", () => {
     const persisted = await ownerCustomers.findByOwner({ ownerType: "User", ownerId: "42", processor: "stripe" });
     expect(createCalls).toBe(1);
     expect(assignment.customerId).toBe("cus_owner_1");
+    expect(persisted?.id).toMatch(/^[0-9a-f-]{36}$/);
     expect(persisted?.processorId).toBe("cus_owner_1");
   });
 
@@ -323,6 +350,16 @@ describe("facade package", () => {
     });
 
     const customerProjections = new Map<string, StripeCustomerProjection>();
+    customerProjections.set("cus_sync_1", {
+      processor: "stripe",
+      processorId: "cus_sync_1",
+      rawPayload: {
+        id: "cus_sync_1",
+        object: "customer",
+        metadata: {},
+        invoice_settings: {},
+      } as unknown as Stripe.Customer,
+    });
     const subscriptionProjections = new Map<string, { processorId: string }>();
     let customerRetrieveCalls = 0;
 
@@ -382,6 +419,9 @@ describe("facade package", () => {
         customers: {
           async upsert(customer) {
             customerProjections.set(customer.processorId, customer);
+          },
+          async findByProcessorId(processorId) {
+            return customerProjections.get(processorId) ?? null;
           },
         },
         subscriptions: {

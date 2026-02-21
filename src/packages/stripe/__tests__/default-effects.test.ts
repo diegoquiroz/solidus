@@ -23,11 +23,6 @@ import {
   createDefaultStripeWebhookEffects,
 } from "../default-webhook-effects.ts";
 import {
-  CheckoutOwnerMismatchError,
-  MalformedCheckoutClientReferenceError,
-  UnknownCheckoutClientReferenceModelError,
-} from "../errors.ts";
-import {
   createStripeWebhookHandlers,
   createStripeWebhookProcessor,
 } from "../webhooks.ts";
@@ -61,6 +56,10 @@ class InMemoryPaymentMethodRepo implements PaymentMethodRepository {
 
   async deleteByProcessorId(processorId: string): Promise<void> {
     this.values.delete(processorId);
+  }
+
+  async findByProcessorId(processorId: string): Promise<PaymentMethodRecord | null> {
+    return this.values.get(processorId) ?? null;
   }
 
   async listByCustomer(customerProcessorId: string): Promise<readonly PaymentMethodRecord[]> {
@@ -365,6 +364,15 @@ describe("stripe default webhook effects", () => {
     const invoiceRepo = new InMemoryInvoiceRepo();
     const stripe = createFakeStripe();
 
+    await customerRepo.upsert({
+      processor: "stripe",
+      processorId: "cus_1",
+      rawPayload: {
+        id: "cus_1",
+        object: "customer",
+      } as unknown as Stripe.Customer,
+    });
+
     const processor = createStripeWebhookProcessor({
       handlers: createStripeWebhookHandlers({
         effects: createDefaultStripeWebhookEffects({
@@ -402,6 +410,15 @@ describe("stripe default webhook effects", () => {
     const invoiceRepo = new InMemoryInvoiceRepo();
     const stripe = createFakeStripe();
 
+    await customerRepo.upsert({
+      processor: "stripe",
+      processorId: "cus_1",
+      rawPayload: {
+        id: "cus_1",
+        object: "customer",
+      } as unknown as Stripe.Customer,
+    });
+
     const processor = createStripeWebhookProcessor({
       handlers: createStripeWebhookHandlers({
         effects: createDefaultStripeWebhookEffects({
@@ -431,10 +448,173 @@ describe("stripe default webhook effects", () => {
     expect(invoiceRepo.values.size).toBe(1);
   });
 
+  test("default effects reconcile payment method defaults on customer.updated", async () => {
+    const customerRepo = new InMemoryCustomerRepo();
+    const paymentMethodRepo = new InMemoryPaymentMethodRepo();
+    await customerRepo.upsert({
+      processor: "stripe",
+      processorId: "cus_1",
+      rawPayload: {
+        id: "cus_1",
+        object: "customer",
+      } as unknown as Stripe.Customer,
+    });
+    await paymentMethodRepo.upsert({
+      id: "pm_local_1",
+      processor: "stripe",
+      processorId: "pm_1",
+      customerProcessorId: "cus_1",
+      methodType: "card",
+      isDefault: true,
+      rawPayload: {},
+    });
+
+    const stripe = {
+      customers: {
+        retrieve: async () => ({
+          id: "cus_1",
+          object: "customer",
+          email: "user@example.com",
+          metadata: {},
+          invoice_settings: {
+            default_payment_method: null,
+          },
+        } as unknown as Stripe.Customer),
+      },
+    } as unknown as Stripe;
+
+    const processor = createStripeWebhookProcessor({
+      handlers: createStripeWebhookHandlers({
+        effects: createDefaultStripeWebhookEffects({
+          stripe,
+          repositories: {
+            customers: customerRepo,
+            paymentMethods: paymentMethodRepo,
+          },
+        }),
+      }),
+    });
+
+    await processor.process(makeEvent("customer.updated", "cus_1"));
+
+    expect(paymentMethodRepo.values.get("pm_1")?.isDefault).toBe(false);
+  });
+
+  test("default effects cleanup mirrors pay behavior on customer.deleted", async () => {
+    const customerRepo = new InMemoryCustomerRepo();
+    const paymentMethodRepo = new InMemoryPaymentMethodRepo();
+    const subscriptionRepo = new InMemorySubscriptionRepo();
+
+    await customerRepo.upsert({
+      processor: "stripe",
+      processorId: "cus_1",
+      email: "owner@example.com",
+      metadata: {},
+      rawPayload: {
+        id: "cus_1",
+        object: "customer",
+      } as unknown as Stripe.Customer,
+    });
+
+    await paymentMethodRepo.upsert({
+      id: "pm_local_1",
+      processor: "stripe",
+      processorId: "pm_1",
+      customerProcessorId: "cus_1",
+      methodType: "card",
+      isDefault: true,
+      rawPayload: {},
+    });
+    await paymentMethodRepo.upsert({
+      id: "pm_local_2",
+      processor: "stripe",
+      processorId: "pm_other",
+      customerProcessorId: "cus_other",
+      methodType: "card",
+      isDefault: true,
+      rawPayload: {},
+    });
+
+    await subscriptionRepo.upsert({
+      id: "sub_local_1",
+      processor: "stripe",
+      processorId: "sub_active",
+      customerProcessorId: "cus_1",
+      status: "active",
+      cancelAtPeriodEnd: false,
+      rawPayload: {},
+    });
+    await subscriptionRepo.upsert({
+      id: "sub_local_2",
+      processor: "stripe",
+      processorId: "sub_canceled",
+      customerProcessorId: "cus_1",
+      status: "canceled",
+      cancelAtPeriodEnd: false,
+      rawPayload: {},
+    });
+    await subscriptionRepo.upsert({
+      id: "sub_local_3",
+      processor: "stripe",
+      processorId: "sub_other",
+      customerProcessorId: "cus_other",
+      status: "active",
+      cancelAtPeriodEnd: false,
+      rawPayload: {},
+    });
+
+    const processor = createStripeWebhookProcessor({
+      handlers: createStripeWebhookHandlers({
+        effects: createDefaultStripeWebhookEffects({
+          stripe: createFakeStripe(),
+          repositories: {
+            customers: customerRepo,
+            paymentMethods: paymentMethodRepo,
+            subscriptions: subscriptionRepo,
+          },
+        }),
+      }),
+    });
+
+    await processor.process(
+      makeEventWithObject("customer.deleted", {
+        id: "cus_1",
+        object: "customer",
+        deleted: true,
+      }),
+    );
+
+    expect(paymentMethodRepo.values.has("pm_1")).toBe(false);
+    expect(paymentMethodRepo.values.has("pm_other")).toBe(true);
+    expect(subscriptionRepo.values.get("sub_active")?.status).toBe("canceled");
+    expect(subscriptionRepo.values.get("sub_canceled")?.status).toBe("canceled");
+    expect(subscriptionRepo.values.get("sub_other")?.status).toBe("active");
+    const deletedPayload = customerRepo.values.get("cus_1")?.rawPayload as unknown as Record<string, unknown>;
+    expect(deletedPayload.id).toBe("cus_1");
+    expect(deletedPayload.deleted).toBe(true);
+  });
+
   test("default effects resolve connected account context per customer and prevent leakage", async () => {
     const customerRepo = new InMemoryCustomerRepo();
     const invoiceRepo = new InMemoryInvoiceRepo();
     const seenInvoiceOptions: Array<Stripe.RequestOptions | undefined> = [];
+
+    await customerRepo.upsert({
+      processor: "stripe",
+      processorId: "cus_a",
+      rawPayload: {
+        id: "cus_a",
+        object: "customer",
+      } as unknown as Stripe.Customer,
+    });
+    await customerRepo.upsert({
+      processor: "stripe",
+      processorId: "cus_b",
+      rawPayload: {
+        id: "cus_b",
+        object: "customer",
+      } as unknown as Stripe.Customer,
+    });
 
     const stripe = {
       customers: {
@@ -519,7 +699,7 @@ describe("stripe default webhook effects", () => {
     await processor.process(
       makeEventWithObject("checkout.session.completed", {
         id: "cs_complete",
-        client_reference_id: "User:42",
+        client_reference_id: "User_42",
         customer: "cus_1",
       }),
     );
@@ -527,11 +707,12 @@ describe("stripe default webhook effects", () => {
     await processor.process(
       makeEventWithObject("checkout.session.async_payment_succeeded", {
         id: "cs_async",
-        client_reference_id: "User:42",
+        client_reference_id: "User_42",
         customer: "cus_1",
       }),
     );
 
+    expect(ownerRepo.values.get("User:42")?.id).toMatch(/^[0-9a-f-]{36}$/);
     expect(ownerRepo.values.get("User:42")?.processorId).toBe("cus_1");
     expect(ownerRepo.saveCalls).toBe(1);
   });
@@ -559,12 +740,13 @@ describe("stripe default webhook effects", () => {
 
     const event = makeEventWithObject("checkout.session.completed", {
       id: "cs_replay",
-      client_reference_id: "User:42",
+      client_reference_id: "User_42",
       customer: "cus_1",
     });
     await processor.process(event);
     await processor.process(event);
 
+    expect(ownerRepo.values.get("User:42")?.id).toMatch(/^[0-9a-f-]{36}$/);
     expect(ownerRepo.values.get("User:42")?.processorId).toBe("cus_1");
     expect(ownerRepo.saveCalls).toBe(1);
   });
@@ -595,7 +777,7 @@ describe("stripe default webhook effects", () => {
     await processor.process(
       makeEventWithObject("checkout.session.completed", {
         id: "cs_with_payment_intent",
-        client_reference_id: "User:42",
+        client_reference_id: "User_42",
         customer: "cus_1",
         payment_intent: "pi_1",
       }),
@@ -603,13 +785,14 @@ describe("stripe default webhook effects", () => {
 
     await processor.process(makeEvent("payment_intent.succeeded", "pi_1"));
 
+    expect(ownerRepo.values.get("User:42")?.id).toMatch(/^[0-9a-f-]{36}$/);
     expect(ownerRepo.values.get("User:42")?.processorId).toBe("cus_1");
     expect(ownerRepo.saveCalls).toBe(1);
     expect(chargeRepo.values.size).toBe(1);
     expect(chargeRepo.values.get("ch_1")?.processorId).toBe("ch_1");
   });
 
-  test("default effects resolve default model for bare checkout references", async () => {
+  test("default effects skip owner linking for malformed checkout references", async () => {
     const ownerRepo = new InMemoryOwnerCustomerRepo();
     const customerRegistry = createCustomerRegistry();
     registerCustomerModel(customerRegistry, {
@@ -638,7 +821,7 @@ describe("stripe default webhook effects", () => {
       }),
     );
 
-    expect(ownerRepo.values.get("User:42")?.processorId).toBe("cus_1");
+    expect(ownerRepo.values.size).toBe(0);
   });
 
   test("default effects skip owner linking when checkout reference or customer is missing", async () => {
@@ -671,7 +854,7 @@ describe("stripe default webhook effects", () => {
     await processor.process(
       makeEventWithObject("checkout.session.async_payment_succeeded", {
         id: "cs_missing_customer",
-        client_reference_id: "User:42",
+        client_reference_id: "User_42",
       }),
     );
 
@@ -679,7 +862,7 @@ describe("stripe default webhook effects", () => {
     expect(ownerRepo.saveCalls).toBe(0);
   });
 
-  test("default effects reject malformed and unknown checkout client references", async () => {
+  test("default effects no-op on malformed and unknown checkout client references", async () => {
     const ownerRepo = new InMemoryOwnerCustomerRepo();
     const customerRegistry = createCustomerRegistry();
     registerCustomerModel(customerRegistry, {
@@ -700,31 +883,30 @@ describe("stripe default webhook effects", () => {
       }),
     });
 
-    await expect(
-      processor.process(
-        makeEventWithObject("checkout.session.completed", {
-          id: "cs_bad",
-          client_reference_id: "User:",
-          customer: "cus_1",
-        }),
-      ),
-    ).rejects.toBeInstanceOf(MalformedCheckoutClientReferenceError);
+    await processor.process(
+      makeEventWithObject("checkout.session.completed", {
+        id: "cs_bad",
+        client_reference_id: "User:",
+        customer: "cus_1",
+      }),
+    );
 
-    await expect(
-      processor.process(
-        makeEventWithObject("checkout.session.completed", {
-          id: "cs_unknown",
-          client_reference_id: "Team:99",
-          customer: "cus_1",
-        }),
-      ),
-    ).rejects.toBeInstanceOf(UnknownCheckoutClientReferenceModelError);
+    await processor.process(
+      makeEventWithObject("checkout.session.completed", {
+        id: "cs_unknown",
+        client_reference_id: "Team_99",
+        customer: "cus_1",
+      }),
+    );
+
+    expect(ownerRepo.values.size).toBe(0);
+    expect(ownerRepo.saveCalls).toBe(0);
   });
 
-  test("default effects enforce owner mismatch guardrails", async () => {
+  test("default effects allow owner relinking to a new checkout customer", async () => {
     const ownerRepo = new InMemoryOwnerCustomerRepo();
     await ownerRepo.save({
-      id: "stripe_owner_User_42",
+      id: "stripe_customer_cus_existing",
       ownerType: "User",
       ownerId: "42",
       processor: "stripe",
@@ -749,15 +931,15 @@ describe("stripe default webhook effects", () => {
       }),
     });
 
-    await expect(
-      processor.process(
-        makeEventWithObject("checkout.session.completed", {
-          id: "cs_mismatch",
-          client_reference_id: "User:42",
-          customer: "cus_1",
-        }),
-      ),
-    ).rejects.toBeInstanceOf(CheckoutOwnerMismatchError);
+    await processor.process(
+      makeEventWithObject("checkout.session.completed", {
+        id: "cs_mismatch",
+        client_reference_id: "User_42",
+        customer: "cus_1",
+      }),
+    );
+
+    expect(ownerRepo.values.get("User:42")?.processorId).toBe("cus_1");
   });
 
   test("default effects sync connected account projections from account.updated transitions", async () => {

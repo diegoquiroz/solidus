@@ -37,10 +37,10 @@ This guide helps teams move from direct Stripe SDK usage to Solidus with minimal
 
 - Canonical setup path: `docs/getting-started.md`
 - Pay-style domain docs:
-  - `docs/pay-customers.md`
-  - `docs/pay-payment-methods.md`
-  - `docs/pay-charges.md`
-  - `docs/pay-subscriptions.md`
-  - `docs/pay-webhooks.md`
+  - `docs/3_customers.md`
+  - `docs/4_payment_methods.md`
+  - `docs/5_charges.md`
+  - `docs/6_subscriptions.md`
+  - `docs/7_webhooks.md`
 - Production hardening: `docs/sequelize-express-production-hardening.md`
 - Rails non-portable differences: `docs/not-portable-from-rails.md`

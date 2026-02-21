@@ -103,7 +103,7 @@ describe("stripe webhook handlers", () => {
     await processor.process(
       makeEvent("checkout.session.completed", {
         id: "cs_1",
-        client_reference_id: "User:1",
+        client_reference_id: "User_1",
         customer: "cus_1",
       }),
     );
@@ -111,14 +111,14 @@ describe("stripe webhook handlers", () => {
     await processor.process(
       makeEvent("checkout.session.async_payment_succeeded", {
         id: "cs_2",
-        client_reference_id: "User:1",
+        client_reference_id: "User_1",
         customer: "cus_1",
       }),
     );
 
     expect(calls).toEqual([
-      "checkout.session.completed:User:1:cus_1",
-      "checkout.session.async_payment_succeeded:User:1:cus_1",
+      "checkout.session.completed:User_1:cus_1",
+      "checkout.session.async_payment_succeeded:User_1:cus_1",
     ]);
   });
 

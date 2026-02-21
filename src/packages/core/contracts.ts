@@ -15,7 +15,7 @@ export interface CustomerRepository {
     ownerId: string;
     processor?: string;
   }): Promise<CustomerRecord | null>;
-  findByProcessor?(input: {
+  findByProcessor(input: {
     processor: string;
     processorId: string;
   }): Promise<CustomerRecord | null>;
@@ -66,6 +66,7 @@ export interface PaymentMethodRepository {
   upsert(paymentMethod: PaymentMethodRecord): Promise<void>;
   clearDefaultForCustomer(customerProcessorId: string): Promise<void>;
   deleteByProcessorId(processorId: string): Promise<void>;
+  findByProcessorId(processorId: string): Promise<PaymentMethodRecord | null>;
   listByCustomer(customerProcessorId: string): Promise<readonly PaymentMethodRecord[]>;
 }
 

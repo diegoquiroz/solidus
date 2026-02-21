@@ -9,14 +9,14 @@ import type {
   SubscriptionRecord,
   SubscriptionRepository,
 } from "../core/contracts.ts";
+import { createOpaqueId } from "../core/opaque-id.ts";
 import type {
   StripeAccountProjection,
   StripeAccountProjectionRepository,
   StripeCustomerProjection,
   StripeCustomerProjectionRepository,
 } from "./core-apis.ts";
-import { CheckoutOwnerMismatchError } from "./errors.ts";
-import { parseCheckoutClientReferenceId } from "./owner-linking.ts";
+import { tryParseCheckoutClientReferenceId } from "./owner-linking.ts";
 import type { StripeWebhookEffects } from "./webhooks.ts";
 
 export interface StripeInvoiceProjection {
@@ -36,6 +36,7 @@ export interface StripeInvoiceProjection {
 
 export interface StripeInvoiceProjectionRepository {
   upsert(invoice: StripeInvoiceProjection): Promise<void>;
+  findByProcessorId?(processorId: string): Promise<StripeInvoiceProjection | null>;
 }
 
 export interface StripeDefaultWebhookEffectRepositories {
@@ -120,7 +121,7 @@ async function resolveRequestOptions(input: {
     return undefined;
   }
 
-  const customer = await input.customersRepository?.findByProcessorId?.(customerId);
+  const customer = await input.customersRepository?.findByProcessorId(customerId);
   const connectedAccountId = customer?.connectedAccountId;
 
   if (typeof connectedAccountId === "string" && connectedAccountId.length > 0) {
@@ -190,7 +191,11 @@ function toCustomerProjection(input: {
   };
 }
 
-function toPaymentMethodRecord(paymentMethod: Stripe.PaymentMethod): PaymentMethodRecord | null {
+function toPaymentMethodRecord(input: {
+  paymentMethod: Stripe.PaymentMethod;
+  id: string;
+}): PaymentMethodRecord | null {
+  const paymentMethod = input.paymentMethod;
   const customerId = pickCustomerId(paymentMethod.customer);
 
   if (customerId === undefined) {
@@ -198,7 +203,7 @@ function toPaymentMethodRecord(paymentMethod: Stripe.PaymentMethod): PaymentMeth
   }
 
   return {
-    id: `stripe_pm_${paymentMethod.id}`,
+    id: input.id,
     processor: "stripe",
     processorId: paymentMethod.id,
     customerProcessorId: customerId,
@@ -212,7 +217,11 @@ function toPaymentMethodRecord(paymentMethod: Stripe.PaymentMethod): PaymentMeth
   };
 }
 
-function toSubscriptionRecord(subscription: Stripe.Subscription): SubscriptionRecord | null {
+function toSubscriptionRecord(input: {
+  subscription: Stripe.Subscription;
+  id: string;
+}): SubscriptionRecord | null {
+  const subscription = input.subscription;
   const firstItem = subscription.items.data[0];
   const rawSubscription = subscription as Stripe.Subscription & {
     current_period_start?: number;
@@ -225,7 +234,7 @@ function toSubscriptionRecord(subscription: Stripe.Subscription): SubscriptionRe
   }
 
   return {
-    id: `stripe_sub_${subscription.id}`,
+    id: input.id,
     processor: "stripe",
     processorId: subscription.id,
     customerProcessorId,
@@ -242,14 +251,18 @@ function toSubscriptionRecord(subscription: Stripe.Subscription): SubscriptionRe
   };
 }
 
-function toInvoiceProjection(invoice: Stripe.Invoice): StripeInvoiceProjection {
+function toInvoiceProjection(input: {
+  invoice: Stripe.Invoice;
+  id: string;
+}): StripeInvoiceProjection {
+  const invoice = input.invoice;
   const customerProcessorId = pickCustomerId(invoice.customer);
   const subscriptionProcessorId = pickSubscriptionId(
     (invoice as Stripe.Invoice & { subscription?: Stripe.Subscription | string | null }).subscription ?? null,
   );
 
   return {
-    id: `stripe_invoice_${invoice.id}`,
+    id: input.id,
     processor: "stripe",
     processorId: invoice.id,
     customerProcessorId,
@@ -291,6 +304,7 @@ function toAccountProjection(account: Stripe.Account): StripeAccountProjection {
 function toChargeRecord(input: {
   charge: Stripe.Charge;
   paymentIntent: Stripe.PaymentIntent | null;
+  id: string;
 }): ChargeRecord | null {
   const customerProcessorId =
     pickCustomerId(input.paymentIntent?.customer ?? null) ?? pickCustomerId(input.charge.customer);
@@ -306,7 +320,7 @@ function toChargeRecord(input: {
     .filter((value): value is number => typeof value === "number");
 
   return {
-    id: `stripe_charge_${input.charge.id}`,
+    id: input.id,
     processor: "stripe",
     processorId: input.charge.id,
     customerProcessorId,
@@ -325,6 +339,14 @@ function toChargeRecord(input: {
   };
 }
 
+function isActiveStripeSubscriptionStatus(status: string): boolean {
+  return status === "trialing"
+    || status === "active"
+    || status === "past_due"
+    || status === "unpaid"
+    || status === "paused";
+}
+
 export function createDefaultStripeWebhookEffects(
   options: StripeDefaultWebhookEffectsOptions,
 ): StripeWebhookEffects {
@@ -333,6 +355,12 @@ export function createDefaultStripeWebhookEffects(
   return {
     async syncCustomerById(customerId, event) {
       if (repositories.customers === undefined) {
+        return;
+      }
+
+      const existingCustomer = await repositories.customers.findByProcessorId(customerId);
+
+      if (existingCustomer === null) {
         return;
       }
 
@@ -345,8 +373,39 @@ export function createDefaultStripeWebhookEffects(
       const customer = await options.stripe.customers.retrieve(customerId, requestOptions) as Stripe.Customer;
       await repositories.customers.upsert(toCustomerProjection({
         customer,
-        connectedAccountId: getConnectedAccountId(requestOptions),
+        connectedAccountId: getConnectedAccountId(requestOptions) ?? existingCustomer.connectedAccountId,
       }));
+
+      if (repositories.paymentMethods === undefined) {
+        return;
+      }
+
+      const defaultPaymentMethodId =
+        typeof customer.invoice_settings.default_payment_method === "string"
+          ? customer.invoice_settings.default_payment_method
+          : customer.invoice_settings.default_payment_method?.id;
+
+      await repositories.paymentMethods.clearDefaultForCustomer(customerId);
+
+      if (defaultPaymentMethodId === undefined) {
+        return;
+      }
+
+      const paymentMethod = await options.stripe.paymentMethods.retrieve(defaultPaymentMethodId, requestOptions);
+      const existing = await repositories.paymentMethods.findByProcessorId(defaultPaymentMethodId);
+      const record = toPaymentMethodRecord({
+        paymentMethod,
+        id: existing?.id ?? createOpaqueId(),
+      });
+
+      if (record === null) {
+        return;
+      }
+
+      await repositories.paymentMethods.upsert({
+        ...record,
+        isDefault: true,
+      });
     },
 
     async deleteCustomerById(customerId, event) {
@@ -354,9 +413,42 @@ export function createDefaultStripeWebhookEffects(
         return;
       }
 
+      const existingCustomer = await repositories.customers.findByProcessorId(customerId);
+
+      if (existingCustomer === null) {
+        return;
+      }
+
+      if (repositories.subscriptions !== undefined) {
+        const subscriptions = await repositories.subscriptions.listByCustomer(customerId);
+
+        for (const subscription of subscriptions) {
+          if (!isActiveStripeSubscriptionStatus(subscription.status)) {
+            continue;
+          }
+
+          await repositories.subscriptions.upsert({
+            ...subscription,
+            status: "canceled",
+            currentPeriodEnd: new Date(),
+          });
+        }
+      }
+
+      if (repositories.paymentMethods !== undefined) {
+        const paymentMethods = await repositories.paymentMethods.listByCustomer(customerId);
+
+        for (const paymentMethod of paymentMethods) {
+          await repositories.paymentMethods.deleteByProcessorId(paymentMethod.processorId);
+        }
+      }
+
       await repositories.customers.upsert({
         processor: "stripe",
         processorId: customerId,
+        connectedAccountId: existingCustomer?.connectedAccountId,
+        email: existingCustomer?.email,
+        metadata: existingCustomer?.metadata,
         rawPayload: event.data.object as Stripe.Customer,
       });
     },
@@ -381,7 +473,11 @@ export function createDefaultStripeWebhookEffects(
         resolveRequestOptions: options.resolveRequestOptions,
       });
       const paymentMethod = await options.stripe.paymentMethods.retrieve(paymentMethodId, requestOptions);
-      const record = toPaymentMethodRecord(paymentMethod);
+      const existing = await repositories.paymentMethods.findByProcessorId(paymentMethodId);
+      const record = toPaymentMethodRecord({
+        paymentMethod,
+        id: existing?.id ?? createOpaqueId(),
+      });
 
       if (record === null) {
         return;
@@ -420,7 +516,12 @@ export function createDefaultStripeWebhookEffects(
         paymentIntentId === undefined
           ? null
           : await options.stripe.paymentIntents.retrieve(paymentIntentId, requestOptions);
-      const record = toChargeRecord({ charge, paymentIntent });
+      const existing = await repositories.charges.findByProcessorId(chargeId);
+      const record = toChargeRecord({
+        charge,
+        paymentIntent,
+        id: existing?.id ?? createOpaqueId(),
+      });
 
       if (record === null) {
         return;
@@ -450,7 +551,12 @@ export function createDefaultStripeWebhookEffects(
           ? paymentIntent.latest_charge
           : paymentIntent.latest_charge.id;
       const charge = await options.stripe.charges.retrieve(chargeId, requestOptions);
-      const record = toChargeRecord({ charge, paymentIntent });
+      const existing = await repositories.charges.findByProcessorId(chargeId);
+      const record = toChargeRecord({
+        charge,
+        paymentIntent,
+        id: existing?.id ?? createOpaqueId(),
+      });
 
       if (record === null) {
         return;
@@ -470,7 +576,11 @@ export function createDefaultStripeWebhookEffects(
         resolveRequestOptions: options.resolveRequestOptions,
       });
       const subscription = await options.stripe.subscriptions.retrieve(subscriptionId, requestOptions);
-      const record = toSubscriptionRecord(subscription);
+      const existing = await repositories.subscriptions.findByProcessorId(subscriptionId);
+      const record = toSubscriptionRecord({
+        subscription,
+        id: existing?.id ?? createOpaqueId(),
+      });
 
       if (record === null) {
         return;
@@ -490,7 +600,11 @@ export function createDefaultStripeWebhookEffects(
         resolveRequestOptions: options.resolveRequestOptions,
       });
       const invoice = await options.stripe.invoices.retrieve(invoiceId, requestOptions);
-      await repositories.invoices.upsert(toInvoiceProjection(invoice));
+      const existing = await repositories.invoices.findByProcessorId?.(invoiceId);
+      await repositories.invoices.upsert(toInvoiceProjection({
+        invoice,
+        id: existing?.id ?? createOpaqueId(),
+      }));
     },
 
     async notifyPaymentActionRequired({ invoiceId, event }) {
@@ -504,7 +618,11 @@ export function createDefaultStripeWebhookEffects(
         resolveRequestOptions: options.resolveRequestOptions,
       });
       const invoice = await options.stripe.invoices.retrieve(invoiceId, requestOptions);
-      await repositories.invoices.upsert(toInvoiceProjection(invoice));
+      const existing = await repositories.invoices.findByProcessorId?.(invoiceId);
+      await repositories.invoices.upsert(toInvoiceProjection({
+        invoice,
+        id: existing?.id ?? createOpaqueId(),
+      }));
     },
 
     async notifyPaymentFailed(invoiceId, event) {
@@ -518,7 +636,11 @@ export function createDefaultStripeWebhookEffects(
         resolveRequestOptions: options.resolveRequestOptions,
       });
       const invoice = await options.stripe.invoices.retrieve(invoiceId, requestOptions);
-      await repositories.invoices.upsert(toInvoiceProjection(invoice));
+      const existing = await repositories.invoices.findByProcessorId?.(invoiceId);
+      await repositories.invoices.upsert(toInvoiceProjection({
+        invoice,
+        id: existing?.id ?? createOpaqueId(),
+      }));
     },
 
     async linkCheckoutOwner(input) {
@@ -526,58 +648,32 @@ export function createDefaultStripeWebhookEffects(
         return;
       }
 
-      const parsed = parseCheckoutClientReferenceId({
+      const parsed = tryParseCheckoutClientReferenceId({
         clientReferenceId: input.clientReferenceId,
         customerRegistry: options.customerRegistry,
       });
+
+      if (parsed === null) {
+        return;
+      }
+
       const existing = await repositories.ownerCustomers.findByOwner({
         ownerType: parsed.modelName,
         ownerId: parsed.ownerId,
         processor: "stripe",
       });
 
-      if (existing !== null && existing.processorId !== input.customerId) {
-        throw new CheckoutOwnerMismatchError(
-          `Checkout owner ${parsed.modelName}:${parsed.ownerId} is already linked to a different Stripe customer.`,
-          {
-            ownerType: parsed.modelName,
-            ownerId: parsed.ownerId,
-            existingCustomerId: existing.processorId,
-            nextCustomerId: input.customerId,
-            eventId: input.event.id,
-          },
-        );
-      }
-
       if (existing?.processorId === input.customerId) {
         return;
       }
 
-      const byProcessor = await repositories.ownerCustomers.findByProcessor?.({
+      const byProcessor = await repositories.ownerCustomers.findByProcessor({
         processor: "stripe",
         processorId: input.customerId,
       });
 
-      if (
-        byProcessor !== undefined
-        && byProcessor !== null
-        && (byProcessor.ownerType !== parsed.modelName || byProcessor.ownerId !== parsed.ownerId)
-      ) {
-        throw new CheckoutOwnerMismatchError(
-          `Stripe customer ${input.customerId} is already linked to ${byProcessor.ownerType}:${byProcessor.ownerId}.`,
-          {
-            ownerType: parsed.modelName,
-            ownerId: parsed.ownerId,
-            existingOwnerType: byProcessor.ownerType,
-            existingOwnerId: byProcessor.ownerId,
-            customerId: input.customerId,
-            eventId: input.event.id,
-          },
-        );
-      }
-
       await repositories.ownerCustomers.save({
-        id: `stripe_owner_${parsed.modelName}_${parsed.ownerId}`,
+        id: existing?.id ?? byProcessor?.id ?? createOpaqueId(),
         ownerType: parsed.modelName,
         ownerId: parsed.ownerId,
         processor: "stripe",

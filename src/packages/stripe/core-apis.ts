@@ -8,6 +8,7 @@ import type {
   SubscriptionRepository,
 } from "../core/contracts.ts";
 import { ActionRequiredError, ConfigurationError } from "../core/errors.ts";
+import { createOpaqueId } from "../core/opaque-id.ts";
 import { mapStripeError } from "./errors.ts";
 
 export interface StripeCustomerProjection {
@@ -21,7 +22,7 @@ export interface StripeCustomerProjection {
 
 export interface StripeCustomerProjectionRepository {
   upsert(customer: StripeCustomerProjection): Promise<void>;
-  findByProcessorId?(processorId: string): Promise<StripeCustomerProjection | null>;
+  findByProcessorId(processorId: string): Promise<StripeCustomerProjection | null>;
 }
 
 export interface StripeAccountProjection {
@@ -292,13 +293,16 @@ function withCheckoutSessionIdUrls(urls: StripeCheckoutUrls): StripeCheckoutUrls
   };
 }
 
-function normalizePaymentMethod(
-  paymentMethod: Stripe.PaymentMethod,
-  customerId: string,
-  isDefault: boolean,
-): PaymentMethodRecord {
+function normalizePaymentMethod(input: {
+  paymentMethod: Stripe.PaymentMethod;
+  customerId: string;
+  isDefault: boolean;
+  id: string;
+}): PaymentMethodRecord {
+  const { paymentMethod, customerId, isDefault, id } = input;
+
   return {
-    id: `stripe_pm_${paymentMethod.id}`,
+    id,
     processor: "stripe",
     processorId: paymentMethod.id,
     customerProcessorId: customerId,
@@ -312,7 +316,11 @@ function normalizePaymentMethod(
   };
 }
 
-function toSubscriptionRecord(subscription: Stripe.Subscription): SubscriptionRecord {
+function toSubscriptionRecord(input: {
+  subscription: Stripe.Subscription;
+  id: string;
+}): SubscriptionRecord {
+  const { subscription, id } = input;
   const firstItem = subscription.items.data[0];
   const rawSubscription = subscription as Stripe.Subscription & {
     current_period_start?: number;
@@ -320,7 +328,7 @@ function toSubscriptionRecord(subscription: Stripe.Subscription): SubscriptionRe
   };
 
   return {
-    id: `stripe_sub_${subscription.id}`,
+    id,
     processor: "stripe",
     processorId: subscription.id,
     customerProcessorId:
@@ -366,9 +374,13 @@ function getPaymentMethodSnapshot(
 }
 
 function toChargeRecord(
-  paymentIntent: Stripe.PaymentIntent,
-  charge: Stripe.Charge | null,
+  input: {
+    paymentIntent: Stripe.PaymentIntent;
+    charge: Stripe.Charge | null;
+    id: string;
+  },
 ): ChargeRecord {
+  const { paymentIntent, charge, id } = input;
   const customerId =
     typeof paymentIntent.customer === "string" ? paymentIntent.customer : paymentIntent.customer?.id;
 
@@ -385,7 +397,7 @@ function toChargeRecord(
     .filter((value): value is number => typeof value === "number");
 
   return {
-    id: `stripe_charge_${charge?.id ?? paymentIntent.id}`,
+    id,
     processor: "stripe",
     processorId: charge?.id ?? paymentIntent.id,
     customerProcessorId: customerId,
@@ -433,6 +445,30 @@ async function resolveLatestCharge(
   return paymentIntent.latest_charge;
 }
 
+async function resolvePaymentMethodRecordId(
+  repositories: StripeCoreRepositories,
+  paymentMethodId: string,
+): Promise<string> {
+  const existing = await repositories.paymentMethods?.findByProcessorId(paymentMethodId);
+  return existing?.id ?? createOpaqueId();
+}
+
+async function resolveChargeRecordId(
+  repositories: StripeCoreRepositories,
+  chargeId: string,
+): Promise<string> {
+  const existing = await repositories.charges?.findByProcessorId(chargeId);
+  return existing?.id ?? createOpaqueId();
+}
+
+async function resolveSubscriptionRecordId(
+  repositories: StripeCoreRepositories,
+  subscriptionId: string,
+): Promise<string> {
+  const existing = await repositories.subscriptions?.findByProcessorId(subscriptionId);
+  return existing?.id ?? createOpaqueId();
+}
+
 async function updateSubscriptionAndPersist(
   stripe: Stripe,
   repositories: StripeCoreRepositories,
@@ -440,7 +476,11 @@ async function updateSubscriptionAndPersist(
   update: Stripe.SubscriptionUpdateParams,
 ): Promise<Stripe.Subscription> {
   const subscription = await stripe.subscriptions.update(subscriptionId, update);
-  await repositories.subscriptions?.upsert(toSubscriptionRecord(subscription));
+  const recordId = await resolveSubscriptionRecordId(repositories, subscription.id);
+  await repositories.subscriptions?.upsert(toSubscriptionRecord({
+    subscription,
+    id: recordId,
+  }));
   return subscription;
 }
 
@@ -574,7 +614,12 @@ export function createStripeCoreApi(options: StripeCoreApiOptions) {
           isDefault = true;
         }
 
-        const record = normalizePaymentMethod(attached, input.customerId, isDefault);
+        const record = normalizePaymentMethod({
+          paymentMethod: attached,
+          customerId: input.customerId,
+          isDefault,
+          id: await resolvePaymentMethodRecordId(repositories, attached.id),
+        });
         await repositories.paymentMethods?.upsert(record);
         return record;
       } catch (error: unknown) {
@@ -589,7 +634,12 @@ export function createStripeCoreApi(options: StripeCoreApiOptions) {
       try {
         const paymentMethod = await options.stripe.paymentMethods.update(paymentMethodId, update);
         const customerId = pickCustomerIdFromPaymentMethod(paymentMethod);
-        const record = normalizePaymentMethod(paymentMethod, customerId, false);
+        const record = normalizePaymentMethod({
+          paymentMethod,
+          customerId,
+          isDefault: false,
+          id: await resolvePaymentMethodRecordId(repositories, paymentMethod.id),
+        });
         await repositories.paymentMethods?.upsert(record);
         return record;
       } catch (error: unknown) {
@@ -612,7 +662,12 @@ export function createStripeCoreApi(options: StripeCoreApiOptions) {
         const paymentMethod = await options.stripe.paymentMethods.retrieve(input.paymentMethodId);
 
         await repositories.paymentMethods?.upsert(
-          normalizePaymentMethod(paymentMethod, input.customerId, true),
+          normalizePaymentMethod({
+            paymentMethod,
+            customerId: input.customerId,
+            isDefault: true,
+            id: await resolvePaymentMethodRecordId(repositories, paymentMethod.id),
+          }),
         );
       } catch (error: unknown) {
         throw mapStripeError(error, "customers.update(default_payment_method)");
@@ -645,7 +700,11 @@ export function createStripeCoreApi(options: StripeCoreApiOptions) {
         });
 
         const latestCharge = await resolveLatestCharge(options.stripe, paymentIntent);
-        const record = toChargeRecord(paymentIntent, latestCharge);
+        const record = toChargeRecord({
+          paymentIntent,
+          charge: latestCharge,
+          id: await resolveChargeRecordId(repositories, latestCharge?.id ?? paymentIntent.id),
+        });
         await repositories.charges?.upsert(record);
         return record;
       } catch (error: unknown) {
@@ -668,7 +727,11 @@ export function createStripeCoreApi(options: StripeCoreApiOptions) {
         });
 
         const latestCharge = await resolveLatestCharge(options.stripe, paymentIntent);
-        const record = toChargeRecord(paymentIntent, latestCharge);
+        const record = toChargeRecord({
+          paymentIntent,
+          charge: latestCharge,
+          id: await resolveChargeRecordId(repositories, latestCharge?.id ?? paymentIntent.id),
+        });
         await repositories.charges?.upsert(record);
         return record;
       } catch (error: unknown) {
@@ -682,7 +745,11 @@ export function createStripeCoreApi(options: StripeCoreApiOptions) {
           amount_to_capture: input.amountToCapture,
         });
         const latestCharge = await resolveLatestCharge(options.stripe, paymentIntent);
-        const record = toChargeRecord(paymentIntent, latestCharge);
+        const record = toChargeRecord({
+          paymentIntent,
+          charge: latestCharge,
+          id: await resolveChargeRecordId(repositories, latestCharge?.id ?? paymentIntent.id),
+        });
         await repositories.charges?.upsert(record);
         return record;
       } catch (error: unknown) {
@@ -701,7 +768,11 @@ export function createStripeCoreApi(options: StripeCoreApiOptions) {
 
         const paymentIntent = await options.stripe.paymentIntents.retrieve(input.paymentIntentId);
         const latestCharge = await resolveLatestCharge(options.stripe, paymentIntent);
-        const record = toChargeRecord(paymentIntent, latestCharge);
+        const record = toChargeRecord({
+          paymentIntent,
+          charge: latestCharge,
+          id: await resolveChargeRecordId(repositories, latestCharge?.id ?? paymentIntent.id),
+        });
         await repositories.charges?.upsert(record);
         return record;
       } catch (error: unknown) {
@@ -738,7 +809,10 @@ export function createStripeCoreApi(options: StripeCoreApiOptions) {
           ...input.stripeOptions,
         });
 
-        const record = toSubscriptionRecord(subscription);
+        const record = toSubscriptionRecord({
+          subscription,
+          id: await resolveSubscriptionRecordId(repositories, subscription.id),
+        });
         await repositories.subscriptions?.upsert(record);
         return record;
       } catch (error: unknown) {
@@ -758,13 +832,19 @@ export function createStripeCoreApi(options: StripeCoreApiOptions) {
         { cancel_at_period_end: true },
       );
 
-      return toSubscriptionRecord(subscription);
+      return toSubscriptionRecord({
+        subscription,
+        id: await resolveSubscriptionRecordId(repositories, subscription.id),
+      });
     },
 
     async cancelNow(subscriptionId: string): Promise<SubscriptionRecord> {
       try {
         const subscription = await options.stripe.subscriptions.cancel(subscriptionId);
-        const record = toSubscriptionRecord(subscription);
+        const record = toSubscriptionRecord({
+          subscription,
+          id: await resolveSubscriptionRecordId(repositories, subscription.id),
+        });
         await repositories.subscriptions?.upsert(record);
         return record;
       } catch (error: unknown) {
@@ -782,7 +862,10 @@ export function createStripeCoreApi(options: StripeCoreApiOptions) {
         },
       );
 
-      return toSubscriptionRecord(subscription);
+      return toSubscriptionRecord({
+        subscription,
+        id: await resolveSubscriptionRecordId(repositories, subscription.id),
+      });
     },
 
     async swap(input: StripeSubscriptionSwapInput): Promise<SubscriptionRecord> {
@@ -812,7 +895,10 @@ export function createStripeCoreApi(options: StripeCoreApiOptions) {
           },
         );
 
-        return toSubscriptionRecord(subscription);
+        return toSubscriptionRecord({
+          subscription,
+          id: await resolveSubscriptionRecordId(repositories, subscription.id),
+        });
       } catch (error: unknown) {
         if (error instanceof ActionRequiredError) {
           throw error;
@@ -848,7 +934,10 @@ export function createStripeCoreApi(options: StripeCoreApiOptions) {
           },
         );
 
-        return toSubscriptionRecord(subscription);
+        return toSubscriptionRecord({
+          subscription,
+          id: await resolveSubscriptionRecordId(repositories, subscription.id),
+        });
       } catch (error: unknown) {
         if (error instanceof ActionRequiredError) {
           throw error;
@@ -872,7 +961,10 @@ export function createStripeCoreApi(options: StripeCoreApiOptions) {
         },
       );
 
-      return toSubscriptionRecord(subscription);
+      return toSubscriptionRecord({
+        subscription,
+        id: await resolveSubscriptionRecordId(repositories, subscription.id),
+      });
     },
 
     async unpause(subscriptionId: string): Promise<SubscriptionRecord> {
@@ -885,7 +977,10 @@ export function createStripeCoreApi(options: StripeCoreApiOptions) {
         },
       );
 
-      return toSubscriptionRecord(subscription);
+      return toSubscriptionRecord({
+        subscription,
+        id: await resolveSubscriptionRecordId(repositories, subscription.id),
+      });
     },
 
     async retryFailedPayment(subscriptionId: string): Promise<readonly Stripe.Invoice[]> {

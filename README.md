@@ -1,45 +1,36 @@
-# @diegoquiroz/solidus
+# Solidus
 
-To install dependencies:
+Solidus is a Stripe billing library for TypeScript backends, inspired by the ergonomics of the Ruby `pay` gem.
 
-```bash
-bun install
-```
+## Payment Processor
 
-To run:
+- Stripe (current scope)
 
-```bash
-bun run index.ts
-```
+## Docs
 
-This project was created using `bun init` in bun v1.3.9. [Bun](https://bun.com) is a fast all-in-one JavaScript runtime.
+- [Docs home](docs/index.md)
+- [Express + Sequelize + TypeScript (LLM guide)](docs/llms/express-sequelize-typescript.md)
 
-## Quickstart
+### Quickstart (Pay-style flow)
 
-Start with one canonical setup path: `docs/getting-started.md`.
+- [Installation](docs/1_installation.md)
+- [Configuration](docs/2_configuration.md)
+- [Customers](docs/3_customers.md)
+- [Payment Methods](docs/4_payment_methods.md)
+- [Charges](docs/5_charges.md)
+- [Subscriptions](docs/6_subscriptions.md)
+- [Routes & Webhooks](docs/7_webhooks.md)
 
-## Pay parity docs
+### Reference
 
-- Machine-readable Stripe parity matrix: `docs/pay-stripe-parity-matrix.json`
-- Parity sign-off checklist (US-014): `docs/pay-parity-signoff-checklist.md`
-- Pay-style domain guides:
-  - `docs/pay-customers.md`
-  - `docs/pay-payment-methods.md`
-  - `docs/pay-charges.md`
-  - `docs/pay-subscriptions.md`
-  - `docs/pay-webhooks.md`
-- Rails-specific gaps and intentional non-portable behavior: `docs/not-portable-from-rails.md`
-- Sequelize + Express production hardening: `docs/sequelize-express-production-hardening.md`
+- `docs/getting-started.md`
+- `docs/facade-api.md`
+- `docs/stripe-core-apis.md`
+- `docs/express-webhooks.md`
 
-## Runtime compatibility
+### Operations and parity
 
-Solidus includes runtime smoke checks for Node.js, Bun, and Deno.
-
-See `docs/runtime-compatibility.md` for the supported version matrix, caveats, and runtime test commands.
-
-## Facade and release docs
-
-- Facade API: `docs/facade-api.md`
-- Migration guide: `docs/migration-from-ad-hoc-stripe.md`
-- Manual release process: `docs/release-manual.md`
-- Release notes + upgrade guide template: `docs/release-notes-and-upgrade-guide.md`
+- `docs/sequelize-express-production-hardening.md`
+- `docs/webhook-operations-runbook.md`
+- `docs/pay-stripe-parity-matrix.json`
+- `docs/pay-parity-signoff-checklist.md`

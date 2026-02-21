@@ -12,7 +12,7 @@
         "facade.api.customers.reconcileByProcessorId"
       ],
       "docs": [
-        "docs/pay-customers.md",
+        "docs/3_customers.md",
         "docs/stripe-core-apis.md"
       ],
       "notes": "Auto-link on registration is not implicit; use explicit reconciliation."
@@ -26,7 +26,7 @@
         "facade.api.paymentMethods.detach"
       ],
       "docs": [
-        "docs/pay-payment-methods.md",
+        "docs/4_payment_methods.md",
         "docs/stripe-core-apis.md"
       ],
       "notes": "SetupIntent-first pattern is recommended for production SCA flows."
@@ -41,7 +41,7 @@
         "facade.api.charges.refund"
       ],
       "docs": [
-        "docs/pay-charges.md",
+        "docs/5_charges.md",
         "docs/stripe-core-apis.md"
       ],
       "notes": "SCA continuation surfaces ActionRequiredError with continuation metadata."
@@ -63,7 +63,7 @@
         "facade.api.state"
       ],
       "docs": [
-        "docs/pay-subscriptions.md",
+        "docs/6_subscriptions.md",
         "docs/stripe-core-apis.md"
       ],
       "notes": "Pause default behavior uses void for Pay parity."
@@ -77,11 +77,11 @@
         "createSolidusFacade({ webhookRegistration.enableDefaultEffects })"
       ],
       "docs": [
-        "docs/pay-webhooks.md",
+        "docs/7_webhooks.md",
         "docs/express-webhooks.md",
         "docs/stripe-webhook-coverage-matrix.md"
       ],
-      "notes": "Persist-first with idempotency is required for safe replay semantics."
+      "notes": "Persist-first with idempotency is required for safe replay semantics; checkout owner linking is best-effort and malformed/unknown references no-op."
     },
     {
       "capability": "checkout-and-billing-portal",

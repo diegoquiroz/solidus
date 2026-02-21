@@ -13,14 +13,14 @@
 | `customer.subscription.updated` | Sync subscription projection by subscription ID | Subscriber notification enabled |
 | `customer.subscription.deleted` | Sync subscription projection by subscription ID | Subscriber notification enabled |
 | `customer.subscription.trial_will_end` | Sync subscription projection + trial warning hook | Subscriber notification enabled |
-| `customer.updated` | Sync customer projection by customer ID | Subscriber notification enabled |
-| `customer.deleted` | Delete/cancel customer projection by customer ID | Subscriber notification enabled |
+| `customer.updated` | Sync customer projection + reconcile default payment method state | Subscriber notification enabled |
+| `customer.deleted` | Cancel active subscriptions, delete customer payment methods, and tombstone customer projection | Subscriber notification enabled |
 | `payment_method.attached` | Sync payment method projection by payment method ID | Subscriber notification enabled |
 | `payment_method.updated` | Sync payment method projection by payment method ID | Subscriber notification enabled |
 | `payment_method.card_automatically_updated` | Sync payment method projection by payment method ID | Subscriber notification enabled |
 | `payment_method.detached` | Delete payment method projection by payment method ID | Subscriber notification enabled |
 | `account.updated` | Sync connected account projection by account ID | Subscriber notification enabled |
-| `checkout.session.completed` | Optional owner link by `client_reference_id` + sync charge/subscription | Subscriber notification enabled |
-| `checkout.session.async_payment_succeeded` | Sync charge/subscription for delayed methods | Subscriber notification enabled |
+| `checkout.session.completed` | Best-effort owner link by `client_reference_id` + sync charge/subscription | Invalid/unknown references are no-op |
+| `checkout.session.async_payment_succeeded` | Same flow as `checkout.session.completed` | Best-effort owner link + sync charge/subscription |
 
 Fixtures covering every mapped event live in `src/packages/stripe/__tests__/fixtures/webhook-events.json`.

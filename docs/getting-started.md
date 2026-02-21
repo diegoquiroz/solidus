@@ -154,7 +154,7 @@ The script validates processor assignment, checkout owner-linking, SCA action-re
 
 ## Next docs
 
-- Domain flows: `docs/pay-customers.md`, `docs/pay-payment-methods.md`, `docs/pay-charges.md`, `docs/pay-subscriptions.md`, `docs/pay-webhooks.md`
+- Domain flows: `docs/3_customers.md`, `docs/4_payment_methods.md`, `docs/5_charges.md`, `docs/6_subscriptions.md`, `docs/7_webhooks.md`
 - SCA + checkout + metering + tax + connect: `docs/stripe-core-apis.md`
 - Production hardening: `docs/sequelize-express-production-hardening.md`
 - Migration planning: `docs/migration-from-ad-hoc-stripe.md`

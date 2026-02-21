@@ -9,7 +9,7 @@ export interface ParsedCheckoutClientReference {
   ownerId: string;
 }
 
-function splitReference(clientReferenceId: string): { modelName?: string; ownerId: string } {
+function splitReference(clientReferenceId: string): ParsedCheckoutClientReference {
   const trimmed = clientReferenceId.trim();
 
   if (trimmed.length === 0) {
@@ -18,18 +18,23 @@ function splitReference(clientReferenceId: string): { modelName?: string; ownerI
     });
   }
 
-  const colonIndex = trimmed.indexOf(":");
+  const underscoreIndex = trimmed.indexOf("_");
 
-  if (colonIndex <= 0) {
-    return { ownerId: trimmed };
+  if (underscoreIndex <= 0) {
+    throw new MalformedCheckoutClientReferenceError(
+      "Checkout client reference id must use the format <ModelName>_<OwnerId>.",
+      {
+        clientReferenceId,
+      },
+    );
   }
 
-  const modelName = trimmed.slice(0, colonIndex).trim();
-  const ownerId = trimmed.slice(colonIndex + 1).trim();
+  const modelName = trimmed.slice(0, underscoreIndex).trim();
+  const ownerId = trimmed.slice(underscoreIndex + 1).trim();
 
   if (modelName.length === 0 || ownerId.length === 0) {
     throw new MalformedCheckoutClientReferenceError(
-      "Checkout client reference id must use the format <ModelName>:<OwnerId>.",
+      "Checkout client reference id must use the format <ModelName>_<OwnerId>.",
       {
         clientReferenceId,
       },
@@ -42,30 +47,22 @@ function splitReference(clientReferenceId: string): { modelName?: string; ownerI
   };
 }
 
+export function tryParseCheckoutClientReferenceId(input: {
+  clientReferenceId: string;
+  customerRegistry: CustomerRegistry;
+}): ParsedCheckoutClientReference | null {
+  try {
+    return parseCheckoutClientReferenceId(input);
+  } catch {
+    return null;
+  }
+}
+
 export function parseCheckoutClientReferenceId(input: {
   clientReferenceId: string;
   customerRegistry: CustomerRegistry;
 }): ParsedCheckoutClientReference {
   const parsed = splitReference(input.clientReferenceId);
-
-  if (parsed.modelName === undefined) {
-    const fallbackModel = input.customerRegistry.getDefault();
-
-    if (fallbackModel === undefined) {
-      throw new UnknownCheckoutClientReferenceModelError(
-        "Checkout client reference id did not include a model and no default customer model is registered.",
-        {
-          clientReferenceId: input.clientReferenceId,
-        },
-      );
-    }
-
-    return {
-      modelName: fallbackModel.modelName,
-      ownerId: parsed.ownerId,
-    };
-  }
-
   const registration = input.customerRegistry.get(parsed.modelName);
 
   if (registration === undefined) {

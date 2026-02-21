@@ -28,6 +28,10 @@ class InMemoryCustomerRepo implements StripeCustomerProjectionRepository {
 
     this.values[index] = customer;
   }
+
+  async findByProcessorId(processorId: string): Promise<StripeCustomerProjection | null> {
+    return this.values.find((value) => value.processorId === processorId) ?? null;
+  }
 }
 
 class InMemoryPaymentMethodRepo implements PaymentMethodRepository {
@@ -58,6 +62,10 @@ class InMemoryPaymentMethodRepo implements PaymentMethodRepository {
     if (index !== -1) {
       this.values.splice(index, 1);
     }
+  }
+
+  async findByProcessorId(processorId: string): Promise<PaymentMethodRecord | null> {
+    return this.values.find((value) => value.processorId === processorId) ?? null;
   }
 
   async listByCustomer(customerProcessorId: string): Promise<readonly PaymentMethodRecord[]> {

@@ -75,11 +75,11 @@ const facade = createSolidusFacade({
 - Pay parity matrix (machine-readable): `docs/pay-stripe-parity-matrix.json`
 - Pay parity sign-off checklist (US-014): `docs/pay-parity-signoff-checklist.md`
 - Pay-style domain docs:
-  - `docs/pay-customers.md`
-  - `docs/pay-payment-methods.md`
-  - `docs/pay-charges.md`
-  - `docs/pay-subscriptions.md`
-  - `docs/pay-webhooks.md`
+  - `docs/3_customers.md`
+  - `docs/4_payment_methods.md`
+  - `docs/5_charges.md`
+  - `docs/6_subscriptions.md`
+  - `docs/7_webhooks.md`
 - Sequelize + Express production hardening: `docs/sequelize-express-production-hardening.md`
 
 ## Validation checklist

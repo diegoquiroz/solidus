@@ -71,6 +71,32 @@ function getObject(value: Stripe.Event): Record<string, unknown> {
   return object as unknown as Record<string, unknown>;
 }
 
+async function handleCheckoutSessionEvent(event: Stripe.Event, effects: StripeWebhookEffects): Promise<void> {
+  const object = getObject(event);
+  const clientReferenceId =
+    typeof object.client_reference_id === "string" ? object.client_reference_id : undefined;
+  const customerId = typeof object.customer === "string" ? object.customer : undefined;
+  const paymentIntentId =
+    typeof object.payment_intent === "string" ? object.payment_intent : undefined;
+  const subscriptionId = typeof object.subscription === "string" ? object.subscription : undefined;
+
+  if (clientReferenceId !== undefined && customerId !== undefined) {
+    await effects.linkCheckoutOwner?.({
+      clientReferenceId,
+      customerId,
+      event,
+    });
+  }
+
+  if (paymentIntentId !== undefined) {
+    await effects.syncChargeByPaymentIntentId?.(paymentIntentId, event);
+  }
+
+  if (subscriptionId !== undefined) {
+    await effects.syncSubscriptionById?.(subscriptionId, event);
+  }
+}
+
 export function diagnoseStripeWebhookEvents(configuredEvents: readonly string[]): StripeWebhookEventDiagnostics {
   const normalizedConfigured = new Set(configuredEvents.map((eventName) => eventName.trim()));
   const missingRequiredEvents = requiredStripeWebhookEvents.filter(
@@ -397,56 +423,11 @@ export function createStripeWebhookHandlers(input: {
     },
 
     "checkout.session.completed": async (event) => {
-      const object = getObject(event);
-
-      const clientReferenceId =
-        typeof object.client_reference_id === "string" ? object.client_reference_id : undefined;
-      const customerId = typeof object.customer === "string" ? object.customer : undefined;
-      const paymentIntentId =
-        typeof object.payment_intent === "string" ? object.payment_intent : undefined;
-      const subscriptionId = typeof object.subscription === "string" ? object.subscription : undefined;
-
-      if (clientReferenceId !== undefined && customerId !== undefined) {
-        await effects.linkCheckoutOwner?.({
-          clientReferenceId,
-          customerId,
-          event,
-        });
-      }
-
-      if (paymentIntentId !== undefined) {
-        await effects.syncChargeByPaymentIntentId?.(paymentIntentId, event);
-      }
-
-      if (subscriptionId !== undefined) {
-        await effects.syncSubscriptionById?.(subscriptionId, event);
-      }
+      await handleCheckoutSessionEvent(event, effects);
     },
 
     "checkout.session.async_payment_succeeded": async (event) => {
-      const object = getObject(event);
-      const clientReferenceId =
-        typeof object.client_reference_id === "string" ? object.client_reference_id : undefined;
-      const customerId = typeof object.customer === "string" ? object.customer : undefined;
-      const paymentIntentId =
-        typeof object.payment_intent === "string" ? object.payment_intent : undefined;
-      const subscriptionId = typeof object.subscription === "string" ? object.subscription : undefined;
-
-      if (clientReferenceId !== undefined && customerId !== undefined) {
-        await effects.linkCheckoutOwner?.({
-          clientReferenceId,
-          customerId,
-          event,
-        });
-      }
-
-      if (paymentIntentId !== undefined) {
-        await effects.syncChargeByPaymentIntentId?.(paymentIntentId, event);
-      }
-
-      if (subscriptionId !== undefined) {
-        await effects.syncSubscriptionById?.(subscriptionId, event);
-      }
+      await handleCheckoutSessionEvent(event, effects);
     },
   };
 

@@ -1,6 +1,7 @@
 import type Stripe from "stripe";
 import type { CustomerRecord, CustomerRegistry, CustomerRepository } from "../core/contracts.ts";
 import { ConfigurationError } from "../core/errors.ts";
+import { createOpaqueId } from "../core/opaque-id.ts";
 import type { StripeCoreApiOptions } from "../stripe/core-apis.ts";
 import { createStripeCoreApi } from "../stripe/core-apis.ts";
 import type { StripeDefaultWebhookEffectRepositories } from "../stripe/default-webhook-effects.ts";
@@ -137,16 +138,16 @@ export function createSolidusFacade(options: SolidusFacadeOptions) {
         ownerId: input.ownerId,
       };
 
+      const existingOwnerCustomer = await options.ownerCustomers?.findByOwner({
+        ownerType: owner.ownerType,
+        ownerId: owner.ownerId,
+        processor: "stripe",
+      });
+
       let customerId = input.customerId;
 
       if (customerId === undefined) {
-        const existing = await options.ownerCustomers?.findByOwner({
-          ownerType: owner.ownerType,
-          ownerId: owner.ownerId,
-          processor: "stripe",
-        });
-
-        customerId = existing?.processorId;
+        customerId = existingOwnerCustomer?.processorId;
       }
 
       const customer =
@@ -157,7 +158,7 @@ export function createSolidusFacade(options: SolidusFacadeOptions) {
       const record: CustomerRecord | undefined = options.ownerCustomers === undefined
         ? undefined
         : {
-            id: `stripe_owner_${owner.ownerType}_${owner.ownerId}`,
+            id: existingOwnerCustomer?.id ?? createOpaqueId(),
             ownerType: owner.ownerType,
             ownerId: owner.ownerId,
             processor: "stripe",

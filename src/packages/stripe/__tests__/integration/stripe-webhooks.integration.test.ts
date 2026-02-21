@@ -530,7 +530,7 @@ describe("stripe webhook parity integration", () => {
       eventType: "checkout.session.completed",
       object: {
         id: "cs_1",
-        client_reference_id: "User:42",
+        client_reference_id: "User_42",
         customer: "cus_owner_1",
       },
     });
@@ -541,7 +541,7 @@ describe("stripe webhook parity integration", () => {
       eventType: "checkout.session.async_payment_succeeded",
       object: {
         id: "cs_2",
-        client_reference_id: "User:42",
+        client_reference_id: "User_42",
         customer: "cus_owner_1",
       },
     });

@@ -2,6 +2,13 @@
 
 Guidance for coding agents working in this repository.
 
+## Project Purpose
+
+- This project exists to mirror the Rails `pay` gem behavior and patterns as closely as possible, adapted to this TypeScript/Bun codebase.
+- When making product or architecture decisions, prefer `pay`-compatible semantics over local invention unless the task explicitly calls for divergence.
+- Keep model semantics aligned with `pay`: owner identity lives in owner fields, processor identity lives in processor fields, and surrogate row IDs should stay opaque/non-semantic.
+- If a behavior differs from `pay`, document the rationale in tests or PR descriptions so the divergence is intentional and reviewable.
+
 ## Project Snapshot
 
 - Runtime/package manager: Bun.
