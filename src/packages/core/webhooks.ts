@@ -1,4 +1,8 @@
-import type { IdempotencyRepository, QueueAdapter, QueueJob } from "./contracts.ts";
+import type {
+  IdempotencyRepository,
+  QueueAdapter,
+  QueueJob,
+} from "./contracts.ts";
 
 export interface PersistedWebhookEvent {
   id: string;
@@ -22,8 +26,15 @@ export interface WebhookEventRepository {
     payload: unknown;
     receivedAt: Date;
   }): Promise<"created" | "exists">;
-  findByEventId(input: { processor: string; eventId: string }): Promise<PersistedWebhookEvent | null>;
-  markProcessed(input: { processor: string; eventId: string; processedAt: Date }): Promise<void>;
+  findByEventId(input: {
+    processor: string;
+    eventId: string;
+  }): Promise<PersistedWebhookEvent | null>;
+  markProcessed(input: {
+    processor: string;
+    eventId: string;
+    processedAt: Date;
+  }): Promise<void>;
   markRetrying(input: {
     processor: string;
     eventId: string;
@@ -48,7 +59,10 @@ export interface DbOutboxQueueRecord {
 
 export interface DbOutboxRepository {
   enqueue(input: { job: QueueJob; runAt: Date }): Promise<{ jobId: string }>;
-  claimReady(input: { now: Date; limit: number }): Promise<readonly DbOutboxQueueRecord[]>;
+  claimReady(input: {
+    now: Date;
+    limit: number;
+  }): Promise<readonly DbOutboxQueueRecord[]>;
   acknowledge(jobId: string): Promise<void>;
 }
 
@@ -74,7 +88,13 @@ export interface WebhookLogEntry {
   processor: string;
   eventId: string;
   eventType?: string;
-  status?: "queued" | "duplicate" | "processed" | "retrying" | "dead_letter" | "skipped";
+  status?:
+    | "queued"
+    | "duplicate"
+    | "processed"
+    | "retrying"
+    | "dead_letter"
+    | "skipped";
   attemptCount?: number;
   lagMs?: number;
   error?: string;
@@ -94,7 +114,9 @@ export interface WebhookObservabilityHooks {
 }
 
 export interface WebhookPipeline {
-  ingest(input: WebhookIngestInput): Promise<{ status: "queued" | "duplicate"; jobId?: string }>;
+  ingest(
+    input: WebhookIngestInput,
+  ): Promise<{ status: "queued" | "duplicate"; jobId?: string }>;
   processByEventId(input: { processor: string; eventId: string }): Promise<{
     status: "processed" | "retrying" | "dead_letter" | "skipped";
   }>;
@@ -107,7 +129,20 @@ export interface WebhookHealthDiagnostics {
   retryingCount: number;
   deadLetterCount: number;
   oldestLagMs: number;
-  warnings: readonly ("LAG_THRESHOLD_EXCEEDED" | "DEAD_LETTER_THRESHOLD_EXCEEDED")[];
+  warnings: readonly (
+    | "LAG_THRESHOLD_EXCEEDED"
+    | "DEAD_LETTER_THRESHOLD_EXCEEDED"
+  )[];
+}
+
+export interface WebhookProcessQueuePayload {
+  processor: string;
+  eventId: string;
+}
+
+export interface WebhookProcessQueueJobInput extends WebhookProcessQueuePayload {
+  idempotencyKey?: string;
+  runAt?: Date;
 }
 
 const webhookScope = "webhook";
@@ -124,7 +159,11 @@ function getErrorMessage(error: unknown): string {
   return "Unknown webhook processing failure.";
 }
 
-function createWebhookQueueJob(input: { processor: string; eventId: string; runAt?: Date }): QueueJob {
+function createWebhookQueueJob(input: {
+  processor: string;
+  eventId: string;
+  runAt?: Date;
+}): QueueJob {
   return {
     name: "webhook.process",
     payload: {
@@ -133,6 +172,52 @@ function createWebhookQueueJob(input: { processor: string; eventId: string; runA
     },
     idempotencyKey: `${input.processor}:${input.eventId}`,
     runAt: input.runAt,
+  };
+}
+
+export function parseWebhookProcessQueueJob(
+  job: QueueJob,
+): WebhookProcessQueueJobInput | null {
+  if (
+    job.name !== "webhook.process" ||
+    typeof job.payload !== "object" ||
+    job.payload === null
+  ) {
+    return null;
+  }
+
+  const payload = job.payload as { processor?: unknown; eventId?: unknown };
+  if (
+    typeof payload.processor !== "string" ||
+    typeof payload.eventId !== "string"
+  ) {
+    return null;
+  }
+
+  return {
+    processor: payload.processor,
+    eventId: payload.eventId,
+    idempotencyKey: job.idempotencyKey,
+    runAt: job.runAt,
+  };
+}
+
+export function createWebhookProcessQueueAdapter(options: {
+  enqueueWebhookProcessJob(
+    input: WebhookProcessQueueJobInput,
+  ): Promise<{ jobId: string }>;
+}): QueueAdapter {
+  return {
+    async enqueue(job: QueueJob): Promise<{ jobId: string }> {
+      const parsedJob = parseWebhookProcessQueueJob(job);
+      if (parsedJob === null) {
+        throw new Error(
+          "Queue adapter received unsupported webhook job payload.",
+        );
+      }
+
+      return options.enqueueWebhookProcessJob(parsedJob);
+    },
   };
 }
 
@@ -179,9 +264,13 @@ async function emitMetric(
   }
 }
 
-function computeRetryDelayMs(attemptCount: number, retryPolicy: RetryPolicy): number {
+function computeRetryDelayMs(
+  attemptCount: number,
+  retryPolicy: RetryPolicy,
+): number {
   const exponent = Math.max(0, attemptCount - 1);
-  const delay = retryPolicy.baseDelayMs * retryPolicy.backoffMultiplier ** exponent;
+  const delay =
+    retryPolicy.baseDelayMs * retryPolicy.backoffMultiplier ** exponent;
   return Math.min(delay, retryPolicy.maxDelayMs);
 }
 
@@ -225,12 +314,19 @@ export function createPersistFirstWebhookPipeline(options: {
   const now = options.now ?? (() => new Date());
   const retryPolicy = normalizeRetryPolicy(options.retryPolicy);
 
-  async function processByEventId(input: { processor: string; eventId: string }): Promise<{
+  async function processByEventId(input: {
+    processor: string;
+    eventId: string;
+  }): Promise<{
     status: "processed" | "retrying" | "dead_letter" | "skipped";
   }> {
     const event = await options.eventRepository.findByEventId(input);
 
-    if (event === null || event.processedAt !== undefined || event.deadLetteredAt !== undefined) {
+    if (
+      event === null ||
+      event.processedAt !== undefined ||
+      event.deadLetteredAt !== undefined
+    ) {
       const skippedAt = now();
       await emitLog(options.observability, {
         level: "info",
@@ -366,7 +462,10 @@ export function createPersistFirstWebhookPipeline(options: {
       }
 
       const retryMarkedAt = now();
-      const retryAt = new Date(retryMarkedAt.getTime() + computeRetryDelayMs(attemptCount, retryPolicy));
+      const retryAt = new Date(
+        retryMarkedAt.getTime() +
+          computeRetryDelayMs(attemptCount, retryPolicy),
+      );
 
       await options.eventRepository.markRetrying({
         processor: input.processor,
@@ -376,11 +475,13 @@ export function createPersistFirstWebhookPipeline(options: {
         lastError,
       });
 
-      await options.queue.enqueue(createWebhookQueueJob({
-        processor: input.processor,
-        eventId: input.eventId,
-        runAt: retryAt,
-      }));
+      await options.queue.enqueue(
+        createWebhookQueueJob({
+          processor: input.processor,
+          eventId: input.eventId,
+          runAt: retryAt,
+        }),
+      );
 
       const lagMs = computeLagMs(event.receivedAt, retryMarkedAt);
       await emitLog(options.observability, {
@@ -422,7 +523,9 @@ export function createPersistFirstWebhookPipeline(options: {
   }
 
   return {
-    async ingest(input: WebhookIngestInput): Promise<{ status: "queued" | "duplicate"; jobId?: string }> {
+    async ingest(
+      input: WebhookIngestInput,
+    ): Promise<{ status: "queued" | "duplicate"; jobId?: string }> {
       const ingestReceivedAt = now();
       await emitLog(options.observability, {
         level: "info",
@@ -487,7 +590,8 @@ export function createPersistFirstWebhookPipeline(options: {
         await emitLog(options.observability, {
           level: "info",
           event: "webhook.ingest.duplicate",
-          message: "Webhook event already persisted and is treated as duplicate.",
+          message:
+            "Webhook event already persisted and is treated as duplicate.",
           processor: input.processor,
           eventId: input.eventId,
           eventType: input.eventType,
@@ -555,7 +659,10 @@ export function createPersistFirstWebhookPipeline(options: {
 
       const payload = job.payload as { processor?: unknown; eventId?: unknown };
 
-      if (typeof payload.processor !== "string" || typeof payload.eventId !== "string") {
+      if (
+        typeof payload.processor !== "string" ||
+        typeof payload.eventId !== "string"
+      ) {
         return;
       }
 
@@ -604,7 +711,9 @@ export async function getWebhookHealthDiagnostics(options: {
     oldestLagMs = Math.max(oldestLagMs, lagMs);
   }
 
-  const warnings: Array<"LAG_THRESHOLD_EXCEEDED" | "DEAD_LETTER_THRESHOLD_EXCEEDED"> = [];
+  const warnings: Array<
+    "LAG_THRESHOLD_EXCEEDED" | "DEAD_LETTER_THRESHOLD_EXCEEDED"
+  > = [];
 
   if (oldestLagMs >= lagWarningThresholdMs) {
     warnings.push("LAG_THRESHOLD_EXCEEDED");

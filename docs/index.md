@@ -11,6 +11,7 @@ Solidus follows a Pay-style documentation flow: install, configure, then impleme
 5. [Charges](5_charges.md)
 6. [Subscriptions](6_subscriptions.md)
 7. [Routes & Webhooks](7_webhooks.md)
+8. [Pay-Style Model Ergonomics](8_model_extension.md) (Optional)
 
 ## Implementation guides
 

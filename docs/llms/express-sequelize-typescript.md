@@ -208,23 +208,29 @@ In Solidus, implement this equivalent:
 2. provide a `QueueAdapter` (`createDbOutboxQueueAdapter` recommended)
 3. run a worker loop with `drainDbOutboxQueue(...)`
 
-If your app already has a queue system (BullMQ/SQS/etc), implement `QueueAdapter.enqueue(job)` and execute jobs by calling `pipeline.processQueueJob(job)` in your worker.
+If your app already has a queue system (BullMQ/SQS/etc), use `createWebhookProcessQueueAdapter(...)` and run `pipeline.processByEventId(...)` in your worker.
 
 Minimal custom queue adapter pattern:
 
 ```ts
-import type { QueueAdapter, QueueJob, WebhookPipeline } from "@diegoquiroz/solidus";
-import { createPersistFirstWebhookPipeline } from "@diegoquiroz/solidus";
+import {
+  createPersistFirstWebhookPipeline,
+  createWebhookProcessQueueAdapter,
+  type WebhookPipeline,
+} from "@diegoquiroz/solidus";
 
 let pipeline: WebhookPipeline;
 
-const queue: QueueAdapter = {
-  async enqueue(job: QueueJob) {
+const queue = createWebhookProcessQueueAdapter({
+  async enqueueWebhookProcessJob(job) {
     // Replace with your queue publish logic.
-    await pipeline.processQueueJob(job);
-    return { jobId: `custom-${job.idempotencyKey}` };
+    await pipeline.processByEventId({
+      processor: job.processor,
+      eventId: job.eventId,
+    });
+    return { jobId: `custom-${job.idempotencyKey ?? job.eventId}` };
   },
-};
+});
 
 pipeline = createPersistFirstWebhookPipeline({
   idempotencyRepository: repositoryBundle.webhook.idempotencyRepository,

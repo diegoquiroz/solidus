@@ -80,21 +80,28 @@ setInterval(async () => {
 
 ### Option B: Bring your own queue system
 
-If you already use BullMQ/SQS/etc, implement the `QueueAdapter` contract (`enqueue`) and delegate back into the pipeline worker API.
+If you already use BullMQ/SQS/etc, use `createWebhookProcessQueueAdapter(...)` and delegate to your queue publisher.
 
 ```ts
-import type { QueueAdapter, QueueJob, WebhookPipeline } from "@diegoquiroz/solidus";
-import { createPersistFirstWebhookPipeline } from "@diegoquiroz/solidus";
+import {
+  createPersistFirstWebhookPipeline,
+  createWebhookProcessQueueAdapter,
+  type WebhookPipeline,
+} from "@diegoquiroz/solidus";
 
 let pipeline: WebhookPipeline;
 
-const queue: QueueAdapter = {
-  async enqueue(job: QueueJob) {
+const queue = createWebhookProcessQueueAdapter({
+  async enqueueWebhookProcessJob(job) {
     // Replace this with your queue publish call.
-    await pipeline.processQueueJob(job);
-    return { jobId: `custom-${job.idempotencyKey}` };
+    // Example: bull.add("billing.webhook.process", { processor: job.processor, eventId: job.eventId })
+    await pipeline.processByEventId({
+      processor: job.processor,
+      eventId: job.eventId,
+    });
+    return { jobId: `custom-${job.idempotencyKey ?? job.eventId}` };
   },
-};
+});
 
 pipeline = createPersistFirstWebhookPipeline({
   idempotencyRepository: repositoryBundle.webhook.idempotencyRepository,
