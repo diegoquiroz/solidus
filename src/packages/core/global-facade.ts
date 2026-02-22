@@ -1,4 +1,6 @@
 import type { createSolidusFacade, SolidusFacadeOptions } from "../facade/index.ts";
+import type { SolidusModels } from "../sequelize/initialize-models.ts";
+import type { RepositoryBundle } from "../sequelize/auto-wire.ts";
 
 export type SolidusFacade = ReturnType<typeof createSolidusFacade>;
 
@@ -32,6 +34,8 @@ export class SolidusAlreadyConfiguredError extends Error {
 
 export interface GlobalSolidusConfig extends SolidusFacadeOptions {
   createFacade: (options: SolidusFacadeOptions) => SolidusFacade;
+  models?: SolidusModels;
+  createRepositoryBundle?: (models: SolidusModels) => RepositoryBundle;
 }
 
 export function configure(config: GlobalSolidusConfig): void {
@@ -39,8 +43,27 @@ export function configure(config: GlobalSolidusConfig): void {
     throw new SolidusAlreadyConfiguredError();
   }
 
-  const { createFacade, ...facadeOptions } = config;
-  globalState.facade = createFacade(facadeOptions);
+  const { createFacade, models, createRepositoryBundle, ...facadeOptions } = config;
+  
+  // Auto-wire repositories if models are provided
+  let resolvedFacadeOptions = facadeOptions;
+  if (models !== undefined && createRepositoryBundle !== undefined) {
+    const bundle = createRepositoryBundle(models);
+    resolvedFacadeOptions = {
+      ...facadeOptions,
+      repositories: {
+        ...facadeOptions.repositories,
+        ...bundle.facade,
+      },
+      ownerCustomers: facadeOptions.ownerCustomers ?? bundle.core.customers,
+      webhookRepositories: {
+        ...facadeOptions.webhookRepositories,
+        invoices: bundle.invoices,
+      },
+    };
+  }
+  
+  globalState.facade = createFacade(resolvedFacadeOptions);
   globalState.isConfigured = true;
 }
 

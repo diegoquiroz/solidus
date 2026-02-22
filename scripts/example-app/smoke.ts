@@ -223,8 +223,8 @@ class InMemoryInvoiceRepository {
     this.rows.set(invoice.processorId, invoice);
   }
 
-  findByProcessorId(processorId: string): InvoiceProjectionRecord | undefined {
-    return this.rows.get(processorId);
+  async findByProcessorId(processorId: string): Promise<InvoiceProjectionRecord | null> {
+    return this.rows.get(processorId) ?? null;
   }
 }
 
@@ -467,7 +467,7 @@ const actionRequiredResult = await pipeline.ingest({
 assert(actionRequiredResult.status === "queued", "Action-required invoice webhook should queue.");
 await drainDbOutboxQueue({ outbox, pipeline });
 
-const actionRequiredProjection = invoiceRepository.findByProcessorId("in_1");
+const actionRequiredProjection = await invoiceRepository.findByProcessorId("in_1");
 assert(actionRequiredProjection?.status === "open", "Invoice action-required webhook should persist invoice projection state.");
 
 subscriptions.set("sub_1", {

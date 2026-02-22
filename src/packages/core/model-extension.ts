@@ -44,7 +44,7 @@ export interface BillingOperations {
   getCustomerId(): Promise<string | null>;
 }
 
-class BillingOperationsImpl implements BillingOperations {
+export class BillingOperationsImpl implements BillingOperations {
   private ownerType: string;
   private ownerId: string;
   private facade: SolidusFacade | undefined;

@@ -5,7 +5,9 @@ This is the canonical quickstart for Solidus with Stripe, Express, and Sequelize
 ## 1) Install
 
 ```bash
-bun install
+bun add @diegoquiroz/solidus sequelize stripe
+# or
+npm install @diegoquiroz/solidus sequelize stripe
 ```
 
 ## 2) Configure environment variables
@@ -15,147 +17,98 @@ Set these values before booting your app:
 ```bash
 STRIPE_SECRET_KEY=sk_test_...
 STRIPE_WEBHOOK_SECRET=whsec_...
-NODE_ENV=development
 ```
 
 Notes:
-
 - Bun loads `.env` automatically.
-- For secret rotation, provide multiple webhook secrets in app config.
+- Ensure your `STRIPE_WEBHOOK_SECRET` matches the endpoint you configure in Stripe.
 
-## 3) Stripe dashboard setup
+## 3) Initialize Solidus
 
-Create or update a Stripe webhook endpoint that delivers at least the events listed in `docs/stripe-webhook-coverage-matrix.md`.
+Initialize Solidus with your Sequelize instance and Stripe client. This will automatically set up the required database tables and webhook handling.
 
-At minimum for a first end-to-end flow, enable:
+```typescript
+import { setupSolidus } from '@diegoquiroz/solidus';
+import { Sequelize } from 'sequelize';
+import Stripe from 'stripe';
 
-- `checkout.session.completed`
-- `customer.subscription.updated`
-- `invoice.payment_failed`
-- `payment_method.attached`
+const sequelize = new Sequelize(process.env.DATABASE_URL!);
+const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!);
 
-## 4) Apply Sequelize migrations
-
-Use your app's migration runner and apply the template SQL from `packages/sequelize/migrations/templates`.
-
-Required artifacts include webhook lifecycle and outbox tables documented in `packages/sequelize/README.md`.
-
-Checkpoint:
-
-- Your database has projection tables and webhook queue tables (`webhook_events`, `webhook_outbox` in the template set).
-
-## 5) Wire repositories
-
-Use the first-party Sequelize model path for common setups.
-
-```ts
-import Stripe from "stripe";
-import {
-  createSequelizeRepositoryBundleFromModels,
-  createSolidusFacade,
-} from "@diegoquiroz/solidus";
-
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {});
-
-const repositoryBundle = createSequelizeRepositoryBundleFromModels({
-  customers: customerModel,
-  idempotency: idempotencyKeyModel,
-  stripeCustomers: stripeCustomerProjectionModel,
-  stripeAccounts: stripeAccountProjectionModel,
-  paymentMethods: paymentMethodProjectionModel,
-  charges: chargeProjectionModel,
-  subscriptions: subscriptionProjectionModel,
-  invoices: invoiceProjectionModel,
-  webhookEvents: webhookEventModel,
-  outbox: webhookOutboxModel,
-});
-
-const facade = createSolidusFacade({
+export const solidus = await setupSolidus({
+  sequelize,
   stripe,
-  repositories: repositoryBundle.facade,
-  ownerCustomers: repositoryBundle.core.customers,
-  webhookRepositories: {
-    invoices: repositoryBundle.invoices,
-  },
-  webhookRegistration: {
-    enableDefaultEffects: true,
-  },
+  webhookSecret: process.env.STRIPE_WEBHOOK_SECRET!,
+  runMigrations: true, // Automatically create tables if they don't exist
 });
 ```
 
-If you already have custom delegates, `createSequelizeRepositoryBundle` remains supported.
+## 4) Add Billing to your Model
 
-Checkpoint:
+Enhance your User (or Team/Organization) model with billing capabilities.
 
-- `facade.api.customers.create` and `facade.api.subscriptions.create` are callable.
+```typescript
+import { solidusBilling } from '@diegoquiroz/solidus';
+import { Model, DataTypes } from 'sequelize';
 
-## 6) Add persist-first webhook pipeline
+class User extends Model {
+  declare id: string;
+  declare email: string;
+}
 
-```ts
-import express from "express";
-import Stripe from "stripe";
-import {
-  createDbOutboxQueueAdapter,
-  createPersistFirstWebhookPipeline,
-  createStripeWebhookRouter,
-} from "@diegoquiroz/solidus";
+User.init({
+  id: { type: DataTypes.STRING, primaryKey: true },
+  email: DataTypes.STRING,
+}, { sequelize, modelName: 'User' });
+
+// Add billing mixin
+solidusBilling(User, {
+  ownerType: 'User',
+  getOwnerId: (user) => user.id,
+});
+```
+
+## 5) Create your first charge
+
+Now you can use the billing API directly on your model instances.
+
+```typescript
+const user = await User.create({ id: 'user_123', email: 'test@example.com' });
+
+// Create a one-off charge
+const charge = await user.billing.charge({
+  amount: 1000, // $10.00
+  currency: 'usd',
+  paymentMethodId: 'pm_card_visa', // Or use a token
+});
+
+console.log(`Charge successful: ${charge.id}`);
+```
+
+## 6) Set up Webhooks
+
+Solidus handles webhooks automatically via the `solidus.express.webhookRouter`. Mount it **before** body parsers like `express.json()`.
+
+```typescript
+import express from 'express';
 
 const app = express();
 
-const pipeline = createPersistFirstWebhookPipeline({
-  idempotencyRepository,
-  eventRepository,
-  queue: createDbOutboxQueueAdapter({ outbox: outboxRepository }),
-  processEvent: async (event) => {
-    await facade.webhooks.process(event.payload as Stripe.Event);
-  },
-});
-
-app.use(
-  "/solidus",
-  createStripeWebhookRouter({
-    express,
-    stripe,
-    webhookSecrets: [process.env.STRIPE_WEBHOOK_SECRET!],
-    pipeline,
-    routePath: "/webhooks/stripe",
-    eventModePolicy: {
-      allowLiveEvents: true,
-      allowTestEvents: process.env.NODE_ENV !== "production",
-    },
-  }),
-);
+// Mount webhook router BEFORE body parsers
+app.use('/webhooks/stripe', solidus.express.webhookRouter);
 
 app.use(express.json());
+
+app.listen(3000, () => console.log('Server running on port 3000'));
 ```
 
-Mount-order rule:
+## 7) Next Steps
 
-- Mount `createStripeWebhookRouter(...)` before global `express.json()` so Stripe signature verification receives raw request bytes.
+- **Subscriptions:** `await user.billing.subscribe({ priceId: 'price_...' })`
+- **Customer Portal:** `await user.billing.createPortalSession()`
+- **Production:** See [Production Hardening](sequelize-express-production-hardening.md)
 
-## 7) First-flow checkpoints
+## Troubleshooting
 
-After creating a customer, attaching a payment method, and running one checkout or subscription flow:
-
-- Stripe objects exist in dashboard (customer/subscription or payment intent).
-- Projection rows are persisted in your Sequelize-backed tables.
-- Webhook ingest records transition to `processed` without dead-letter growth.
-- If you disabled test events in production policy, test-mode deliveries are rejected with `WEBHOOK_EVENT_REJECTED`.
-
-## 8) Run parity smoke script
-
-Run the reference smoke checks that mirror Pay-style lifecycle scenarios:
-
-```bash
-bun run test:example-app
-```
-
-The script validates processor assignment, checkout owner-linking, SCA action-required handling, subscription lifecycle projections, webhook replay idempotency, and observability checkpoints.
-
-## Next docs
-
-- Domain flows: `docs/3_customers.md`, `docs/4_payment_methods.md`, `docs/5_charges.md`, `docs/6_subscriptions.md`, `docs/7_webhooks.md`
-- SCA + checkout + metering + tax + connect: `docs/stripe-core-apis.md`
-- Production hardening: `docs/sequelize-express-production-hardening.md`
-- Migration planning: `docs/migration-from-ad-hoc-stripe.md`
-- Rails non-portable differences: `docs/not-portable-from-rails.md`
+- **Migrations:** If `runMigrations: true` fails, ensure your database user has permission to create tables.
+- **Webhooks:** If webhooks are failing, verify the `STRIPE_WEBHOOK_SECRET` and that the route is mounted before `express.json()`.
