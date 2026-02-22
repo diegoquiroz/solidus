@@ -2,18 +2,21 @@ import type { CustomerRecord, CustomerRepository } from "../../core/contracts.ts
 import type { SolidusCustomer } from "../models/SolidusCustomer.ts";
 
 export class SolidusCustomerRepository implements CustomerRepository {
-  constructor(private model: typeof SolidusCustomer) {}
+  constructor(private model: typeof SolidusCustomer) { }
 
   async save(customer: CustomerRecord): Promise<void> {
+    const idValue = customer.id ? Number(customer.id) : undefined;
     await this.model.upsert({
-      id: customer.id,
+      ...(idValue !== undefined && !Number.isNaN(idValue) ? { id: idValue } : {}),
       ownerType: customer.ownerType,
       ownerId: customer.ownerId,
       processor: customer.processor,
       processorId: customer.processorId,
-      email: customer.email,
-      metadata: customer.metadata ?? {},
-    });
+    },
+      {
+        conflictFields: ['processor', 'processor_id'],
+      }
+    );
   }
 
   async findByOwner(input: {
@@ -31,19 +34,17 @@ export class SolidusCustomerRepository implements CustomerRepository {
     }
 
     const row = await this.model.findOne({ where });
-    
+
     if (row === null) {
       return null;
     }
 
     return {
-      id: row.id,
+      id: String(row.id),
       ownerType: row.ownerType,
       ownerId: row.ownerId,
       processor: row.processor,
-      processorId: row.processorId,
-      email: row.email ?? undefined,
-      metadata: row.metadata as Record<string, string> | undefined,
+      processorId: row.processorId ?? '',
     };
   }
 
@@ -63,13 +64,11 @@ export class SolidusCustomerRepository implements CustomerRepository {
     }
 
     return {
-      id: row.id,
+      id: String(row.id),
       ownerType: row.ownerType,
       ownerId: row.ownerId,
       processor: row.processor,
-      processorId: row.processorId,
-      email: row.email ?? undefined,
-      metadata: row.metadata as Record<string, string> | undefined,
+      processorId: row.processorId ?? '',
     };
   }
 }

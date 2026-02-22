@@ -5,9 +5,8 @@ import {
   initSolidusCharge,
   initSolidusSubscription,
   initSolidusPaymentMethod,
-  initSolidusInvoice,
+  initSolidusMerchant,
   initSolidusWebhookEvent,
-  initSolidusWebhookOutbox,
   initSolidusIdempotencyKey,
   initSolidusStripeCustomer,
 } from "./models/index.ts";
@@ -30,9 +29,8 @@ const TABLE_MAPPINGS = {
   charges: "charges",
   subscriptions: "subscriptions",
   paymentMethods: "payment_methods",
-  invoices: "invoices",
-  webhookEvents: "webhook_events",
-  outbox: "outbox",
+  merchants: "merchants",
+  webhookEvents: "webhooks",
   idempotencyKeys: "idempotency_keys",
   stripeCustomers: "stripe_customers",
 } as const;
@@ -72,9 +70,8 @@ export async function migrateToZeroConfig(
     charges: initSolidusCharge(sequelize, newPrefix),
     subscriptions: initSolidusSubscription(sequelize, newPrefix),
     paymentMethods: initSolidusPaymentMethod(sequelize, newPrefix),
-    invoices: initSolidusInvoice(sequelize, newPrefix),
+    merchants: initSolidusMerchant(sequelize, newPrefix),
     webhookEvents: initSolidusWebhookEvent(sequelize, newPrefix),
-    outbox: initSolidusWebhookOutbox(sequelize, newPrefix),
     idempotencyKeys: initSolidusIdempotencyKey(sequelize, newPrefix),
     stripeCustomers: initSolidusStripeCustomer(sequelize, newPrefix),
   };
@@ -116,9 +113,8 @@ export async function migrateToZeroConfig(
         case "charges": model = NewModels.charges; break;
         case "subscriptions": model = NewModels.subscriptions; break;
         case "paymentMethods": model = NewModels.paymentMethods; break;
-        case "invoices": model = NewModels.invoices; break;
+        case "merchants": model = NewModels.merchants; break;
         case "webhookEvents": model = NewModels.webhookEvents; break;
-        case "outbox": model = NewModels.outbox; break;
         case "idempotencyKeys": model = NewModels.idempotencyKeys; break;
         case "stripeCustomers": model = NewModels.stripeCustomers; break;
     }

@@ -8,12 +8,10 @@ import {
   initSolidusSubscription,
   SolidusPaymentMethod,
   initSolidusPaymentMethod,
-  SolidusInvoice,
-  initSolidusInvoice,
+  SolidusMerchant,
+  initSolidusMerchant,
   SolidusWebhookEvent,
   initSolidusWebhookEvent,
-  SolidusWebhookOutbox,
-  initSolidusWebhookOutbox,
   SolidusIdempotencyKey,
   initSolidusIdempotencyKey,
   SolidusStripeCustomer,
@@ -30,9 +28,8 @@ export interface SolidusModels {
   Charge: typeof SolidusCharge;
   Subscription: typeof SolidusSubscription;
   PaymentMethod: typeof SolidusPaymentMethod;
-  Invoice: typeof SolidusInvoice;
+  Merchant: typeof SolidusMerchant;
   WebhookEvent: typeof SolidusWebhookEvent;
-  WebhookOutbox: typeof SolidusWebhookOutbox;
   IdempotencyKey: typeof SolidusIdempotencyKey;
   StripeCustomer: typeof SolidusStripeCustomer;
 }
@@ -48,9 +45,8 @@ export function initializeSolidusModels(
   initSolidusCharge(sequelize, tablePrefix, schema);
   initSolidusSubscription(sequelize, tablePrefix, schema);
   initSolidusPaymentMethod(sequelize, tablePrefix, schema);
-  initSolidusInvoice(sequelize, tablePrefix, schema);
+  initSolidusMerchant(sequelize, tablePrefix, schema);
   initSolidusWebhookEvent(sequelize, tablePrefix, schema);
-  initSolidusWebhookOutbox(sequelize, tablePrefix, schema);
   initSolidusIdempotencyKey(sequelize, tablePrefix, schema);
   initSolidusStripeCustomer(sequelize, tablePrefix, schema);
 
@@ -72,9 +68,8 @@ export function initializeSolidusModels(
     Charge: SolidusCharge,
     Subscription: SolidusSubscription,
     PaymentMethod: SolidusPaymentMethod,
-    Invoice: SolidusInvoice,
+    Merchant: SolidusMerchant,
     WebhookEvent: SolidusWebhookEvent,
-    WebhookOutbox: SolidusWebhookOutbox,
     IdempotencyKey: SolidusIdempotencyKey,
     StripeCustomer: SolidusStripeCustomer,
   };

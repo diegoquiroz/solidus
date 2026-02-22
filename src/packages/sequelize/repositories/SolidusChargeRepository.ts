@@ -2,23 +2,21 @@ import type { ChargeRecord, ChargeRepository } from "../../core/contracts.ts";
 import type { SolidusCharge } from "../models/SolidusCharge.ts";
 
 export class SolidusChargeRepository implements ChargeRepository {
-  constructor(private model: typeof SolidusCharge) {}
+  constructor(private model: typeof SolidusCharge) { }
 
   async upsert(charge: ChargeRecord): Promise<void> {
+    const idValue = charge.id ? Number(charge.id) : undefined;
     await this.model.upsert({
-      id: charge.id,
-      processor: charge.processor,
+      ...(idValue !== undefined && !Number.isNaN(idValue) ? { id: idValue } : {}),
       processorId: charge.processorId,
-      customerProcessorId: charge.customerProcessorId,
+      customerId: Number(charge.customerId),
+      subscriptionId: charge.subscriptionId ? Number(charge.subscriptionId) : null,
       amount: charge.amount,
       currency: charge.currency,
-      status: charge.status,
-      receiptUrl: charge.receiptUrl,
-      taxAmount: charge.taxAmount,
-      totalTaxAmounts: charge.totalTaxAmounts,
-      refundTotal: charge.refundTotal,
-      paymentMethodSnapshot: charge.paymentMethodSnapshot,
-      rawPayload: charge.rawPayload,
+      applicationFeeAmount: charge.applicationFeeAmount,
+      amountRefunded: charge.amountRefunded,
+      metadata: charge.metadata,
+      data: charge.data ?? {},
     });
   }
 
@@ -34,19 +32,16 @@ export class SolidusChargeRepository implements ChargeRepository {
     }
 
     return {
-      id: row.id,
-      processor: row.processor,
+      id: String(row.id),
       processorId: row.processorId,
-      customerProcessorId: row.customerProcessorId,
+      customerId: String(row.customerId),
+      subscriptionId: row.subscriptionId ? String(row.subscriptionId) : undefined,
       amount: row.amount,
-      currency: row.currency,
-      status: row.status,
-      receiptUrl: row.receiptUrl ?? undefined,
-      taxAmount: row.taxAmount ?? undefined,
-      totalTaxAmounts: row.totalTaxAmounts ?? undefined,
-      refundTotal: row.refundTotal ?? undefined,
-      paymentMethodSnapshot: row.paymentMethodSnapshot ?? undefined,
-      rawPayload: row.rawPayload,
+      currency: row.currency ?? undefined,
+      applicationFeeAmount: row.applicationFeeAmount ?? undefined,
+      amountRefunded: row.amountRefunded ?? undefined,
+      metadata: row.metadata ?? undefined,
+      data: row.data ?? undefined,
     };
   }
 }

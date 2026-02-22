@@ -299,28 +299,25 @@ function normalizePaymentMethod(input: {
   isDefault: boolean;
   id: string;
 }): PaymentMethodRecord {
-  const { paymentMethod, customerId, isDefault, id } = input;
+  const { paymentMethod, isDefault, id } = input;
 
   return {
     id,
-    processor: "stripe",
     processorId: paymentMethod.id,
-    customerProcessorId: customerId,
-    methodType: paymentMethod.type ?? "unknown",
-    brand: paymentMethod.card?.brand,
-    last4: paymentMethod.card?.last4,
-    expMonth: paymentMethod.card?.exp_month,
-    expYear: paymentMethod.card?.exp_year,
-    isDefault,
-    rawPayload: paymentMethod,
+    default: isDefault,
+    data: {
+      type: paymentMethod.type,
+      card: paymentMethod.card,
+    },
   };
 }
 
 function toSubscriptionRecord(input: {
   subscription: Stripe.Subscription;
   id: string;
+  customerId: string;
 }): SubscriptionRecord {
-  const { subscription, id } = input;
+  const { subscription, id, customerId } = input;
   const firstItem = subscription.items.data[0];
   const rawSubscription = subscription as Stripe.Subscription & {
     current_period_start?: number;
@@ -329,20 +326,24 @@ function toSubscriptionRecord(input: {
 
   return {
     id,
-    processor: "stripe",
+    customerId,
+    name: firstItem?.price.product?.toString() ?? 'default',
     processorId: subscription.id,
-    customerProcessorId:
-      typeof subscription.customer === "string" ? subscription.customer : subscription.customer.id,
+    processorPlan: firstItem?.price.id ?? '',
+    quantity: firstItem?.quantity ?? 1,
     status: subscription.status,
-    priceId: firstItem?.price.id,
-    quantity: firstItem?.quantity ?? undefined,
-    cancelAtPeriodEnd: subscription.cancel_at_period_end,
     currentPeriodStart: toDate(rawSubscription.current_period_start),
     currentPeriodEnd: toDate(rawSubscription.current_period_end),
     trialEndsAt: toDate(subscription.trial_end),
-    pausedBehavior: subscription.pause_collection?.behavior,
-    pausedResumesAt: toDate(subscription.pause_collection?.resumes_at),
-    rawPayload: subscription,
+    endsAt: toDate(subscription.ended_at),
+    metered: firstItem?.price.recurring?.usage_type === 'metered',
+    pauseBehavior: subscription.pause_collection?.behavior,
+    pauseStartsAt: undefined,
+    pauseResumesAt: toDate(subscription.pause_collection?.resumes_at),
+    data: {
+      cancelAtPeriodEnd: subscription.cancel_at_period_end,
+      rawPayload: subscription,
+    },
   };
 }
 
@@ -378,40 +379,22 @@ function toChargeRecord(
     paymentIntent: Stripe.PaymentIntent;
     charge: Stripe.Charge | null;
     id: string;
+    customerId: string;
   },
 ): ChargeRecord {
-  const { paymentIntent, charge, id } = input;
-  const customerId =
-    typeof paymentIntent.customer === "string" ? paymentIntent.customer : paymentIntent.customer?.id;
-
-  if (customerId === undefined) {
-    throw new ConfigurationError("Stripe PaymentIntent is missing a customer id.", {
-      details: { paymentIntentId: paymentIntent.id },
-    });
-  }
-
-  const taxAmount = paymentIntent.amount_details?.tax?.total_tax_amount ?? undefined;
-  const lineItems = paymentIntent.amount_details?.line_items;
-  const lineItemTaxAmounts = (Array.isArray(lineItems) ? lineItems : lineItems?.data)
-    ?.map((lineItem) => lineItem.tax?.total_tax_amount)
-    .filter((value): value is number => typeof value === "number");
+  const { paymentIntent, charge, id, customerId } = input;
 
   return {
     id,
-    processor: "stripe",
+    customerId,
     processorId: charge?.id ?? paymentIntent.id,
-    customerProcessorId: customerId,
     amount: paymentIntent.amount,
     currency: paymentIntent.currency,
-    status: paymentIntent.status,
-    receiptUrl: charge?.receipt_url ?? undefined,
-    taxAmount,
-    totalTaxAmounts: lineItemTaxAmounts && lineItemTaxAmounts.length > 0 ? lineItemTaxAmounts : undefined,
-    refundTotal: charge?.amount_refunded,
-    paymentMethodSnapshot: getPaymentMethodSnapshot(paymentIntent, charge),
-    rawPayload: {
+    data: {
       paymentIntent,
       charge,
+      receiptUrl: charge?.receipt_url,
+      paymentMethodSnapshot: getPaymentMethodSnapshot(paymentIntent, charge),
     },
   };
 }
@@ -1249,7 +1232,8 @@ export function createStripeCoreApi(options: StripeCoreApiOptions) {
     },
 
     onGracePeriod(subscription: SubscriptionRecord, now = new Date()): boolean {
-      if (!subscription.cancelAtPeriodEnd || subscription.currentPeriodEnd === undefined) {
+      const cancelAtPeriodEnd = (subscription.data as Record<string, unknown>)?.cancelAtPeriodEnd;
+      if (!cancelAtPeriodEnd || subscription.currentPeriodEnd === undefined) {
         return false;
       }
 
@@ -1257,7 +1241,7 @@ export function createStripeCoreApi(options: StripeCoreApiOptions) {
     },
 
     paused(subscription: SubscriptionRecord): boolean {
-      return subscription.pausedBehavior !== undefined;
+      return subscription.pauseBehavior !== undefined;
     },
 
     active(subscription: SubscriptionRecord, now = new Date()): boolean {

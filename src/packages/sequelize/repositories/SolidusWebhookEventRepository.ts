@@ -16,7 +16,7 @@ export class SolidusWebhookEventRepository implements WebhookEventRepository {
         processor: event.processor,
         eventId: event.eventId,
         eventType: event.eventType,
-        payload: event.payload,
+        event: event.payload as Record<string, unknown>,
         receivedAt: event.receivedAt,
         attemptCount: 0,
       });
@@ -47,11 +47,11 @@ export class SolidusWebhookEventRepository implements WebhookEventRepository {
     }
 
     return {
-      id: row.id,
-      processor: row.processor,
-      eventId: row.eventId,
-      eventType: row.eventType,
-      payload: row.payload,
+      id: String(row.id),
+      processor: row.processor ?? '',
+      eventId: row.eventId ?? '',
+      eventType: row.eventType ?? '',
+      payload: row.event,
       attemptCount: row.attemptCount,
       receivedAt: row.receivedAt,
       processedAt: row.processedAt ?? undefined,

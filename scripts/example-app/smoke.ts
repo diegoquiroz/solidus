@@ -211,8 +211,8 @@ class InMemorySubscriptionRepository implements SubscriptionRepository {
     return this.rows.get(processorId) ?? null;
   }
 
-  async listByCustomer(customerProcessorId: string): Promise<readonly SubscriptionRecord[]> {
-    return Array.from(this.rows.values()).filter((row) => row.customerProcessorId === customerProcessorId);
+  async listByCustomer(customerId: string): Promise<readonly SubscriptionRecord[]> {
+    return Array.from(this.rows.values()).filter((row) => row.customerId === customerId);
   }
 }
 

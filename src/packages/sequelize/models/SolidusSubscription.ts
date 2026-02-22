@@ -1,24 +1,28 @@
 import { Model, DataTypes, Sequelize } from 'sequelize';
 
 export class SolidusSubscription extends Model {
-  declare id: string;
-  declare customerId?: string;
-  declare merchantId?: string;
-  declare processor: string;
+  declare id: number;
+  declare customerId: number;
+  declare name: string;
   declare processorId: string;
-  declare customerProcessorId: string;
-  declare status: string;
-  declare planCode?: string;
-  declare priceId?: string;
+  declare processorPlan: string;
   declare quantity: number;
-  declare cancelAtPeriodEnd: boolean;
+  declare status: string;
   declare currentPeriodStart?: Date;
   declare currentPeriodEnd?: Date;
   declare trialEndsAt?: Date;
-  declare pausedBehavior?: 'void' | 'keep_as_draft' | 'mark_uncollectible';
-  declare pausedResumesAt?: Date;
-  declare rawPayload: Record<string, unknown>;
-  declare canceledAt?: Date;
+  declare endsAt?: Date;
+  declare metered?: boolean;
+  declare pauseBehavior?: string;
+  declare pauseStartsAt?: Date;
+  declare pauseResumesAt?: Date;
+  declare applicationFeePercent?: number;
+  declare metadata?: Record<string, unknown>;
+  declare data: Record<string, unknown>;
+  declare stripeAccount?: string;
+  declare paymentMethodId?: string;
+  declare type?: string;
+  declare object?: Record<string, unknown>;
   declare createdAt: Date;
   declare updatedAt: Date;
 }
@@ -26,21 +30,16 @@ export class SolidusSubscription extends Model {
 export function initSolidusSubscription(sequelize: Sequelize, tablePrefix = 'solidus_', schema?: string) {
   SolidusSubscription.init({
     id: { 
-      type: DataTypes.UUID, 
+      type: DataTypes.BIGINT, 
       primaryKey: true, 
-      defaultValue: DataTypes.UUIDV4 
+      autoIncrement: true 
     },
     customerId: { 
       type: DataTypes.BIGINT, 
-      allowNull: true, 
+      allowNull: false, 
       field: 'customer_id' 
     },
-    merchantId: { 
-      type: DataTypes.BIGINT, 
-      allowNull: true, 
-      field: 'merchant_id' 
-    },
-    processor: { 
+    name: { 
       type: DataTypes.STRING, 
       allowNull: false 
     },
@@ -49,35 +48,19 @@ export function initSolidusSubscription(sequelize: Sequelize, tablePrefix = 'sol
       allowNull: false, 
       field: 'processor_id' 
     },
-    customerProcessorId: { 
+    processorPlan: { 
       type: DataTypes.STRING, 
       allowNull: false, 
-      field: 'customer_processor_id' 
-    },
-    status: { 
-      type: DataTypes.STRING, 
-      allowNull: false 
-    },
-    planCode: { 
-      type: DataTypes.STRING, 
-      allowNull: true, 
-      field: 'plan_code' 
-    },
-    priceId: { 
-      type: DataTypes.STRING, 
-      allowNull: true, 
-      field: 'price_id' 
+      field: 'processor_plan' 
     },
     quantity: { 
       type: DataTypes.INTEGER, 
       allowNull: false, 
       defaultValue: 1 
     },
-    cancelAtPeriodEnd: { 
-      type: DataTypes.BOOLEAN, 
-      allowNull: false, 
-      defaultValue: false, 
-      field: 'cancel_at_period_end' 
+    status: { 
+      type: DataTypes.STRING, 
+      allowNull: false 
     },
     currentPeriodStart: { 
       type: DataTypes.DATE, 
@@ -94,25 +77,61 @@ export function initSolidusSubscription(sequelize: Sequelize, tablePrefix = 'sol
       allowNull: true, 
       field: 'trial_ends_at' 
     },
-    pausedBehavior: { 
+    endsAt: { 
+      type: DataTypes.DATE, 
+      allowNull: true, 
+      field: 'ends_at' 
+    },
+    metered: { 
+      type: DataTypes.BOOLEAN, 
+      allowNull: true 
+    },
+    pauseBehavior: { 
       type: DataTypes.STRING, 
       allowNull: true, 
-      field: 'paused_behavior' 
+      field: 'pause_behavior' 
     },
-    pausedResumesAt: { 
+    pauseStartsAt: { 
       type: DataTypes.DATE, 
       allowNull: true, 
-      field: 'paused_resumes_at' 
+      field: 'pause_starts_at' 
     },
-    rawPayload: { 
+    pauseResumesAt: { 
+      type: DataTypes.DATE, 
+      allowNull: true, 
+      field: 'pause_resumes_at' 
+    },
+    applicationFeePercent: { 
+      type: DataTypes.DECIMAL(8, 2), 
+      allowNull: true, 
+      field: 'application_fee_percent' 
+    },
+    metadata: { 
+      type: DataTypes.JSONB, 
+      allowNull: true 
+    },
+    data: { 
       type: DataTypes.JSONB, 
       allowNull: false, 
-      field: 'raw_payload' 
+      defaultValue: {} 
     },
-    canceledAt: { 
-      type: DataTypes.DATE, 
+    stripeAccount: { 
+      type: DataTypes.STRING, 
       allowNull: true, 
-      field: 'canceled_at' 
+      field: 'stripe_account' 
+    },
+    paymentMethodId: { 
+      type: DataTypes.STRING, 
+      allowNull: true, 
+      field: 'payment_method_id' 
+    },
+    type: { 
+      type: DataTypes.STRING, 
+      allowNull: true 
+    },
+    object: { 
+      type: DataTypes.JSONB, 
+      allowNull: true 
     },
   }, {
     sequelize,

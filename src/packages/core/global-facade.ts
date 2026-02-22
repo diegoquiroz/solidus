@@ -58,7 +58,6 @@ export function configure(config: GlobalSolidusConfig): void {
       ownerCustomers: facadeOptions.ownerCustomers ?? bundle.core.customers,
       webhookRepositories: {
         ...facadeOptions.webhookRepositories,
-        invoices: bundle.invoices,
       },
     };
   }

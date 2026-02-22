@@ -1,6 +1,6 @@
 import { Model, DataTypes, Sequelize } from 'sequelize';
 
-export class SolidusCustomer extends Model {
+export class SolidusMerchant extends Model {
   declare id: number;
   declare ownerType: string;
   declare ownerId: string;
@@ -8,16 +8,13 @@ export class SolidusCustomer extends Model {
   declare processorId?: string;
   declare default?: boolean;
   declare data: Record<string, unknown>;
-  declare stripeAccount?: string;
-  declare deletedAt?: Date;
   declare type?: string;
-  declare object?: Record<string, unknown>;
   declare createdAt: Date;
   declare updatedAt: Date;
 }
 
-export function initSolidusCustomer(sequelize: Sequelize, tablePrefix = 'solidus_', schema?: string) {
-  SolidusCustomer.init({
+export function initSolidusMerchant(sequelize: Sequelize, tablePrefix = 'solidus_', schema?: string) {
+  SolidusMerchant.init({
     id: { 
       type: DataTypes.BIGINT, 
       primaryKey: true, 
@@ -52,30 +49,16 @@ export function initSolidusCustomer(sequelize: Sequelize, tablePrefix = 'solidus
       allowNull: false, 
       defaultValue: {} 
     },
-    stripeAccount: { 
-      type: DataTypes.STRING, 
-      allowNull: true, 
-      field: 'stripe_account' 
-    },
-    deletedAt: { 
-      type: DataTypes.DATE, 
-      allowNull: true, 
-      field: 'deleted_at' 
-    },
     type: { 
       type: DataTypes.STRING, 
       allowNull: true 
     },
-    object: { 
-      type: DataTypes.JSONB, 
-      allowNull: true 
-    },
   }, {
     sequelize,
-    tableName: `${tablePrefix}customers`,
+    tableName: `${tablePrefix}merchants`,
     timestamps: true,
     underscored: true,
     schema,
   });
-  return SolidusCustomer;
+  return SolidusMerchant;
 }

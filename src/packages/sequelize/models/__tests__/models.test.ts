@@ -9,12 +9,10 @@ import {
   initSolidusSubscription,
   SolidusPaymentMethod,
   initSolidusPaymentMethod,
-  SolidusInvoice,
-  initSolidusInvoice,
+  SolidusMerchant,
+  initSolidusMerchant,
   SolidusWebhookEvent,
   initSolidusWebhookEvent,
-  SolidusWebhookOutbox,
-  initSolidusWebhookOutbox,
   SolidusIdempotencyKey,
   initSolidusIdempotencyKey,
   SolidusStripeCustomer,
@@ -36,9 +34,8 @@ describe("Solidus Models", () => {
     initSolidusCharge(sequelize);
     initSolidusSubscription(sequelize);
     initSolidusPaymentMethod(sequelize);
-    initSolidusInvoice(sequelize);
+    initSolidusMerchant(sequelize);
     initSolidusWebhookEvent(sequelize);
-    initSolidusWebhookOutbox(sequelize);
     initSolidusIdempotencyKey(sequelize);
     initSolidusStripeCustomer(sequelize);
 

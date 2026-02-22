@@ -19,6 +19,7 @@ bun add @diegoquiroz/solidus sequelize stripe
 Like the `pay` gem, Solidus provides migration code for you to copy into your project. Create a migration file in your project's migrations folder:
 
 **Using Sequelize CLI:**
+
 ```bash
 npx sequelize-cli migration:generate --name create_solidus_tables
 ```
@@ -35,185 +36,146 @@ export async function up(queryInterface: QueryInterface): Promise<void> {
   const transaction = await queryInterface.sequelize.transaction();
 
   try {
-    // 1. solidus_customers
-    await queryInterface.createTable('solidus_customers', {
-      id: { type: DataTypes.UUID, primaryKey: true, defaultValue: DataTypes.UUIDV4 },
+    // 1. solidus_merchants (pay_merchants equivalent)
+    await queryInterface.createTable('solidus_merchants', {
+      id: { type: DataTypes.BIGINT, primaryKey: true, autoIncrement: true },
       owner_type: { type: DataTypes.STRING, allowNull: false },
       owner_id: { type: DataTypes.STRING, allowNull: false },
       processor: { type: DataTypes.STRING, allowNull: false },
-      processor_id: { type: DataTypes.STRING, allowNull: false },
-      email: { type: DataTypes.STRING, allowNull: true },
-      is_default: { type: DataTypes.BOOLEAN, allowNull: false, defaultValue: false },
-      metadata: { type: DataTypes.JSONB, allowNull: false, defaultValue: {} },
+      processor_id: { type: DataTypes.STRING, allowNull: true },
+      default: { type: DataTypes.BOOLEAN, allowNull: true },
+      data: { type: DataTypes.JSONB, allowNull: false, defaultValue: {} },
+      type: { type: DataTypes.STRING, allowNull: true },
       created_at: { type: DataTypes.DATE, allowNull: false },
       updated_at: { type: DataTypes.DATE, allowNull: false },
     }, { transaction });
 
-    await queryInterface.addIndex('solidus_customers', ['owner_type', 'owner_id'], { transaction });
+    await queryInterface.addIndex('solidus_merchants', ['owner_type', 'owner_id'], { transaction });
+    await queryInterface.addIndex('solidus_merchants', ['owner_type', 'owner_id', 'processor'], { transaction });
+
+    // 2. solidus_customers (pay_customers equivalent)
+    await queryInterface.createTable('solidus_customers', {
+      id: { type: DataTypes.BIGINT, primaryKey: true, autoIncrement: true },
+      owner_type: { type: DataTypes.STRING, allowNull: false },
+      owner_id: { type: DataTypes.STRING, allowNull: false },
+      processor: { type: DataTypes.STRING, allowNull: false },
+      processor_id: { type: DataTypes.STRING, allowNull: true },
+      default: { type: DataTypes.BOOLEAN, allowNull: true },
+      data: { type: DataTypes.JSONB, allowNull: false, defaultValue: {} },
+      stripe_account: { type: DataTypes.STRING, allowNull: true },
+      deleted_at: { type: DataTypes.DATE, allowNull: true },
+      type: { type: DataTypes.STRING, allowNull: true },
+      object: { type: DataTypes.JSONB, allowNull: true },
+      created_at: { type: DataTypes.DATE, allowNull: false },
+      updated_at: { type: DataTypes.DATE, allowNull: false },
+    }, { transaction });
+
     await queryInterface.addIndex('solidus_customers', ['processor', 'processor_id'], { unique: true, transaction });
+    await queryInterface.addIndex('solidus_customers', {
+      name: 'pay_customer_owner_index',
+      fields: ['owner_type', 'owner_id', 'deleted_at'],
+      unique: true,
+      transaction,
+    });
 
-    // 2. solidus_charges
-    await queryInterface.createTable('solidus_charges', {
-      id: { type: DataTypes.UUID, primaryKey: true, defaultValue: DataTypes.UUIDV4 },
-      customer_id: { type: DataTypes.UUID, allowNull: true },
-      processor: { type: DataTypes.STRING, allowNull: false },
+    // 3. solidus_payment_methods (pay_payment_methods equivalent)
+    await queryInterface.createTable('solidus_payment_methods', {
+      id: { type: DataTypes.BIGINT, primaryKey: true, autoIncrement: true },
+      customer_id: { type: DataTypes.BIGINT, allowNull: false },
       processor_id: { type: DataTypes.STRING, allowNull: false },
-      customer_processor_id: { type: DataTypes.STRING, allowNull: false },
-      amount: { type: DataTypes.BIGINT, allowNull: false },
-      currency: { type: DataTypes.STRING, allowNull: false },
-      status: { type: DataTypes.STRING, allowNull: false },
-      captured_at: { type: DataTypes.DATE, allowNull: true },
-      receipt_url: { type: DataTypes.TEXT, allowNull: true },
-      tax_amount: { type: DataTypes.BIGINT, allowNull: true },
-      total_tax_amounts: { type: DataTypes.JSONB, allowNull: true },
-      refund_total: { type: DataTypes.BIGINT, allowNull: true },
-      payment_method_snapshot: { type: DataTypes.JSONB, allowNull: true },
-      raw_payload: { type: DataTypes.JSONB, allowNull: false },
-      metadata: { type: DataTypes.JSONB, allowNull: false, defaultValue: {} },
+      default: { type: DataTypes.BOOLEAN, allowNull: true },
+      payment_method_type: { type: DataTypes.STRING, allowNull: true },
+      data: { type: DataTypes.JSONB, allowNull: false, defaultValue: {} },
+      stripe_account: { type: DataTypes.STRING, allowNull: true },
+      type: { type: DataTypes.STRING, allowNull: true },
       created_at: { type: DataTypes.DATE, allowNull: false },
       updated_at: { type: DataTypes.DATE, allowNull: false },
     }, { transaction });
 
-    await queryInterface.addIndex('solidus_charges', ['processor', 'processor_id'], { unique: true, transaction });
-    await queryInterface.addIndex('solidus_charges', ['customer_id'], { transaction });
-    await queryInterface.addIndex('solidus_charges', ['customer_processor_id'], { transaction });
+    await queryInterface.addIndex('solidus_payment_methods', ['customer_id', 'processor_id'], { unique: true, transaction });
+    await queryInterface.addIndex('solidus_payment_methods', {
+      name: 'ux_payment_methods_default_customer',
+      fields: ['customer_id'],
+      unique: true,
+      where: { default: true },
+      transaction,
+    });
 
-    // 3. solidus_subscriptions
+    // 4. solidus_subscriptions (pay_subscriptions equivalent)
     await queryInterface.createTable('solidus_subscriptions', {
-      id: { type: DataTypes.UUID, primaryKey: true, defaultValue: DataTypes.UUIDV4 },
-      customer_id: { type: DataTypes.UUID, allowNull: true },
-      processor: { type: DataTypes.STRING, allowNull: false },
+      id: { type: DataTypes.BIGINT, primaryKey: true, autoIncrement: true },
+      customer_id: { type: DataTypes.BIGINT, allowNull: false },
+      name: { type: DataTypes.STRING, allowNull: false },
       processor_id: { type: DataTypes.STRING, allowNull: false },
-      customer_processor_id: { type: DataTypes.STRING, allowNull: false },
-      status: { type: DataTypes.STRING, allowNull: false },
-      plan_code: { type: DataTypes.STRING, allowNull: true },
-      price_id: { type: DataTypes.STRING, allowNull: true },
+      processor_plan: { type: DataTypes.STRING, allowNull: false },
       quantity: { type: DataTypes.INTEGER, allowNull: false, defaultValue: 1 },
-      cancel_at_period_end: { type: DataTypes.BOOLEAN, allowNull: false, defaultValue: false },
+      status: { type: DataTypes.STRING, allowNull: false },
       current_period_start: { type: DataTypes.DATE, allowNull: true },
       current_period_end: { type: DataTypes.DATE, allowNull: true },
       trial_ends_at: { type: DataTypes.DATE, allowNull: true },
-      paused_behavior: { type: DataTypes.STRING, allowNull: true },
-      paused_resumes_at: { type: DataTypes.DATE, allowNull: true },
-      raw_payload: { type: DataTypes.JSONB, allowNull: false },
-      canceled_at: { type: DataTypes.DATE, allowNull: true },
+      ends_at: { type: DataTypes.DATE, allowNull: true },
+      metered: { type: DataTypes.BOOLEAN, allowNull: true },
+      pause_behavior: { type: DataTypes.STRING, allowNull: true },
+      pause_starts_at: { type: DataTypes.DATE, allowNull: true },
+      pause_resumes_at: { type: DataTypes.DATE, allowNull: true },
+      application_fee_percent: { type: DataTypes.DECIMAL(8, 2), allowNull: true },
+      metadata: { type: DataTypes.JSONB, allowNull: true },
+      data: { type: DataTypes.JSONB, allowNull: false, defaultValue: {} },
+      stripe_account: { type: DataTypes.STRING, allowNull: true },
+      payment_method_id: { type: DataTypes.STRING, allowNull: true },
+      type: { type: DataTypes.STRING, allowNull: true },
+      object: { type: DataTypes.JSONB, allowNull: true },
       created_at: { type: DataTypes.DATE, allowNull: false },
       updated_at: { type: DataTypes.DATE, allowNull: false },
     }, { transaction });
 
-    await queryInterface.addIndex('solidus_subscriptions', ['processor', 'processor_id'], { unique: true, transaction });
-    await queryInterface.addIndex('solidus_subscriptions', ['customer_id'], { transaction });
-    await queryInterface.addIndex('solidus_subscriptions', ['customer_processor_id'], { transaction });
+    await queryInterface.addIndex('solidus_subscriptions', ['customer_id', 'processor_id'], { unique: true, transaction });
+    await queryInterface.addIndex('solidus_subscriptions', ['metered'], { transaction });
+    await queryInterface.addIndex('solidus_subscriptions', ['pause_starts_at'], { transaction });
 
-    // 4. solidus_payment_methods
-    await queryInterface.createTable('solidus_payment_methods', {
-      id: { type: DataTypes.UUID, primaryKey: true, defaultValue: DataTypes.UUIDV4 },
-      customer_id: { type: DataTypes.UUID, allowNull: true },
-      processor: { type: DataTypes.STRING, allowNull: false },
+    // 5. solidus_charges (pay_charges equivalent)
+    await queryInterface.createTable('solidus_charges', {
+      id: { type: DataTypes.BIGINT, primaryKey: true, autoIncrement: true },
+      customer_id: { type: DataTypes.BIGINT, allowNull: false },
+      subscription_id: { type: DataTypes.BIGINT, allowNull: true },
       processor_id: { type: DataTypes.STRING, allowNull: false },
-      customer_processor_id: { type: DataTypes.STRING, allowNull: false },
-      method_type: { type: DataTypes.STRING, allowNull: false },
-      brand: { type: DataTypes.STRING, allowNull: true },
-      last4: { type: DataTypes.STRING, allowNull: true },
-      exp_month: { type: DataTypes.INTEGER, allowNull: true },
-      exp_year: { type: DataTypes.INTEGER, allowNull: true },
-      is_default: { type: DataTypes.BOOLEAN, allowNull: false, defaultValue: false },
-      metadata: { type: DataTypes.JSONB, allowNull: false, defaultValue: {} },
-      raw_payload: { type: DataTypes.JSONB, allowNull: false },
-      created_at: { type: DataTypes.DATE, allowNull: false },
-      updated_at: { type: DataTypes.DATE, allowNull: false },
-    }, { transaction });
-
-    await queryInterface.addIndex('solidus_payment_methods', ['processor', 'processor_id'], { unique: true, transaction });
-    await queryInterface.addIndex('solidus_payment_methods', ['customer_id'], { transaction });
-    await queryInterface.addIndex('solidus_payment_methods', ['customer_processor_id'], { transaction });
-
-    // 5. solidus_invoices
-    await queryInterface.createTable('solidus_invoices', {
-      id: { type: DataTypes.UUID, primaryKey: true, defaultValue: DataTypes.UUIDV4 },
-      processor: { type: DataTypes.STRING, allowNull: false },
-      processor_id: { type: DataTypes.STRING, allowNull: false },
-      customer_processor_id: { type: DataTypes.STRING, allowNull: true },
-      subscription_processor_id: { type: DataTypes.STRING, allowNull: true },
-      status: { type: DataTypes.STRING, allowNull: false },
-      amount_due: { type: DataTypes.BIGINT, allowNull: true },
-      amount_paid: { type: DataTypes.BIGINT, allowNull: true },
+      amount: { type: DataTypes.BIGINT, allowNull: false },
       currency: { type: DataTypes.STRING, allowNull: true },
-      due_at: { type: DataTypes.DATE, allowNull: true },
-      paid_at: { type: DataTypes.DATE, allowNull: true },
-      raw_payload: { type: DataTypes.JSONB, allowNull: false },
+      application_fee_amount: { type: DataTypes.BIGINT, allowNull: true },
+      amount_refunded: { type: DataTypes.BIGINT, allowNull: true },
+      metadata: { type: DataTypes.JSONB, allowNull: true },
+      data: { type: DataTypes.JSONB, allowNull: false, defaultValue: {} },
+      stripe_account: { type: DataTypes.STRING, allowNull: true },
+      type: { type: DataTypes.STRING, allowNull: true },
+      object: { type: DataTypes.JSONB, allowNull: true },
       created_at: { type: DataTypes.DATE, allowNull: false },
       updated_at: { type: DataTypes.DATE, allowNull: false },
     }, { transaction });
 
-    await queryInterface.addIndex('solidus_invoices', ['processor', 'processor_id'], { unique: true, transaction });
+    await queryInterface.addIndex('solidus_charges', ['customer_id', 'processor_id'], { unique: true, transaction });
 
-    // 6. solidus_webhook_events
-    await queryInterface.createTable('solidus_webhook_events', {
-      id: { type: DataTypes.UUID, primaryKey: true, defaultValue: DataTypes.UUIDV4 },
-      processor: { type: DataTypes.STRING, allowNull: false },
-      event_id: { type: DataTypes.STRING, allowNull: false },
-      event_type: { type: DataTypes.STRING, allowNull: false },
-      payload: { type: DataTypes.JSONB, allowNull: false },
-      received_at: { type: DataTypes.DATE, allowNull: false, defaultValue: DataTypes.NOW },
-      processed_at: { type: DataTypes.DATE, allowNull: true },
+    // 6. solidus_webhooks (pay_webhooks equivalent with retry management)
+    await queryInterface.createTable('solidus_webhooks', {
+      id: { type: DataTypes.BIGINT, primaryKey: true, autoIncrement: true },
+      processor: { type: DataTypes.STRING, allowNull: true },
+      event_id: { type: DataTypes.STRING, allowNull: true },
+      event_type: { type: DataTypes.STRING, allowNull: true },
+      event: { type: DataTypes.JSONB, allowNull: false, defaultValue: {} },
+      type: { type: DataTypes.STRING, allowNull: true },
       attempt_count: { type: DataTypes.INTEGER, allowNull: false, defaultValue: 0 },
+      received_at: { type: DataTypes.DATE, allowNull: false },
+      processed_at: { type: DataTypes.DATE, allowNull: true },
       next_attempt_at: { type: DataTypes.DATE, allowNull: true },
       last_error: { type: DataTypes.TEXT, allowNull: true },
       dead_lettered_at: { type: DataTypes.DATE, allowNull: true },
-      failure_count: { type: DataTypes.INTEGER, allowNull: false, defaultValue: 0 },
       created_at: { type: DataTypes.DATE, allowNull: false },
       updated_at: { type: DataTypes.DATE, allowNull: false },
     }, { transaction });
 
-    await queryInterface.addIndex('solidus_webhook_events', ['event_id', 'processor'], { unique: true, transaction });
-
-    // 7. solidus_webhook_outbox
-    await queryInterface.createTable('solidus_webhook_outbox', {
-      id: { type: DataTypes.UUID, primaryKey: true, defaultValue: DataTypes.UUIDV4 },
-      job_name: { type: DataTypes.STRING, allowNull: false },
-      job_payload: { type: DataTypes.JSONB, allowNull: false },
-      job_idempotency_key: { type: DataTypes.STRING, allowNull: true },
-      run_at: { type: DataTypes.DATE, allowNull: false, defaultValue: DataTypes.NOW },
-      processed_at: { type: DataTypes.DATE, allowNull: true },
-      created_at: { type: DataTypes.DATE, allowNull: false },
-      updated_at: { type: DataTypes.DATE, allowNull: false },
-    }, { transaction });
-
-    await queryInterface.addIndex('solidus_webhook_outbox', ['run_at', 'processed_at'], { transaction });
-    await queryInterface.addIndex('solidus_webhook_outbox', ['job_idempotency_key'], { unique: true, transaction });
-
-    // 8. solidus_idempotency_keys
-    await queryInterface.createTable('solidus_idempotency_keys', {
-      id: { type: DataTypes.UUID, primaryKey: true, defaultValue: DataTypes.UUIDV4 },
-      key: { type: DataTypes.STRING, allowNull: false },
-      scope: { type: DataTypes.STRING, allowNull: false },
-      created_at: { type: DataTypes.DATE, allowNull: false },
-      updated_at: { type: DataTypes.DATE, allowNull: false },
-    }, { transaction });
-
-    await queryInterface.addIndex('solidus_idempotency_keys', ['key', 'scope'], { unique: true, transaction });
-
-    // 9. solidus_stripe_customers
-    await queryInterface.createTable('solidus_stripe_customers', {
-      id: { type: DataTypes.UUID, primaryKey: true, defaultValue: DataTypes.UUIDV4 },
-      customer_id: { type: DataTypes.UUID, allowNull: true },
-      processor: { type: DataTypes.STRING, allowNull: false },
-      processor_id: { type: DataTypes.STRING, allowNull: false },
-      email: { type: DataTypes.STRING, allowNull: true },
-      name: { type: DataTypes.STRING, allowNull: true },
-      description: { type: DataTypes.TEXT, allowNull: true },
-      phone: { type: DataTypes.STRING, allowNull: true },
-      balance: { type: DataTypes.BIGINT, allowNull: true },
-      currency: { type: DataTypes.STRING, allowNull: true },
-      delinquent: { type: DataTypes.BOOLEAN, allowNull: true },
-      invoice_prefix: { type: DataTypes.STRING, allowNull: true },
-      raw_payload: { type: DataTypes.JSONB, allowNull: false },
-      created_at: { type: DataTypes.DATE, allowNull: false },
-      updated_at: { type: DataTypes.DATE, allowNull: false },
-    }, { transaction });
-
-    await queryInterface.addIndex('solidus_stripe_customers', ['processor', 'processor_id'], { unique: true, transaction });
+    await queryInterface.addIndex('solidus_webhooks', ['processor'], { transaction });
+    await queryInterface.addIndex('solidus_webhooks', ['event_type'], { transaction });
+    await queryInterface.addIndex('solidus_webhooks', ['created_at'], { transaction });
+    await queryInterface.addIndex('solidus_webhooks', ['processor', 'event_id'], { unique: true, transaction });
 
     await transaction.commit();
   } catch (error) {
@@ -224,15 +186,12 @@ export async function up(queryInterface: QueryInterface): Promise<void> {
 
 export async function down(queryInterface: QueryInterface): Promise<void> {
   const tables = [
-    'solidus_stripe_customers',
-    'solidus_idempotency_keys',
-    'solidus_webhook_outbox',
-    'solidus_webhook_events',
-    'solidus_invoices',
-    'solidus_payment_methods',
-    'solidus_subscriptions',
+    'solidus_webhooks',
     'solidus_charges',
+    'solidus_subscriptions',
+    'solidus_payment_methods',
     'solidus_customers',
+    'solidus_merchants',
   ];
 
   for (const table of tables) {
@@ -240,24 +199,14 @@ export async function down(queryInterface: QueryInterface): Promise<void> {
   }
 }
 ```
+
 </details>
 
 **Run the migration:**
+
 ```bash
 npx sequelize-cli db:migrate
 # or using Umzug, or your migration tool
-```
-
-**Alternative:** Use the migration generator (optional):
-```typescript
-import { generateMigration } from '@diegoquiroz/solidus';
-
-// Generates a timestamped migration file
-const filepath = generateMigration('./migrations', {
-  format: 'typescript',
-  tablePrefix: 'solidus_',
-});
-console.log(`Migration created: ${filepath}`);
 ```
 
 ### Step 3: Initialize Solidus
@@ -302,24 +251,33 @@ await user.billing.charge({ amount: 1000, currency: 'usd' });
 await user.billing.subscribe({ priceId: 'price_monthly' });
 ```
 
-## Before/After Comparison
+## Schema Changes from v1.x
 
-| Step | Old Approach (8 steps) | Zero-Config (3 steps) |
-|------|------------------------|----------------------|
-| 1 | Create 9 models manually | Install package |
-| 2 | Copy SQL templates | Copy migration code |
-| 3 | Create wrapper migration | Call `setupSolidus()` |
-| 4 | Wire repository bundle | Done! |
-| 5 | Create facade | |
-| 6 | Configure webhooks | |
-| 7 | Set up mixins | |
-| 8 | Test integration | |
+The schema has been updated to match the Rails `pay` gem conventions:
+
+### Key Changes
+
+| Table | Changes |
+|-------|---------|
+| **merchants** | NEW - Connected accounts for Stripe Connect |
+| **customers** | `processor_id` is now nullable, `is_default` renamed to `default`, added `type` (STI) and `object` columns, removed `email` and `metadata`, unique index on `(owner_type, owner_id, deleted_at)` |
+| **charges** | Simplified to match pay_charges, added `subscription_id` FK, added `type` (STI) and `object` columns |
+| **subscriptions** | Added `name`, `processor_plan`, `ends_at`, `pause_starts_at`, added `type` (STI) and `object` columns |
+| **payment_methods** | Simplified, removed `processor` field, `method_type` renamed to `payment_method_type`, removed `brand`/`last4`/`exp_month`/`exp_year`, added `type` (STI) column |
+| **webhooks** | Simplified to match pay_webhooks, added `type` (STI) column |
+
+### Removed Tables
+
+- `solidus_invoices` - Not in pay gem, use Stripe API for invoices
+- `solidus_webhook_outbox` - Not in pay gem, implement your own queue
+- `solidus_stripe_customers` - Merged into customers table
 
 ## Troubleshooting
 
 ### Migration already exists error
 
 If you get an error about existing tables when running migrations:
+
 - Check if you've already run the Solidus migration
 - Use `migrateFromLegacy: true` if upgrading from manual setup
 - See [Migration Guide](migration-to-zero-config.md) for upgrading existing databases
@@ -327,6 +285,7 @@ If you get an error about existing tables when running migrations:
 ### TypeScript errors
 
 Make sure your `tsconfig.json` has `esModuleInterop` enabled:
+
 ```json
 {
   "compilerOptions": {
@@ -345,11 +304,3 @@ Ensure your webhook route is mounted **before** `express.json()` middleware.
 - Read the [Getting Started](getting-started.md) guide for a complete walkthrough
 - Check [Migration Guide](migration-to-zero-config.md) if upgrading from manual setup
 - See [LLM Guide](llms/express-sequelize-typescript.md) for AI-assisted implementation
-
-## Legacy Setup (Manual)
-
-If you need the legacy manual setup approach (for advanced customization), see:
-- [Legacy Configuration](2_configuration.md)
-- [Migration from Legacy](migration-to-zero-config.md)
-
-**Note:** The legacy approach is deprecated and will be removed in v2.0.

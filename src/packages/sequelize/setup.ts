@@ -63,19 +63,17 @@ export async function setupSolidus(
     // We pass the repositories explicitly to ensure they are used
     repositories: repositories.facade,
     ownerCustomers: repositories.core.customers,
-    webhookRepositories: {
-      invoices: repositories.invoices,
-    },
+    webhookRepositories: {},
   });
 
   const facade = Solidus.getFacade();
 
   // 4. Create Webhook Pipeline
-  const queueAdapter =
-    options.queueAdapter ??
-    createDbOutboxQueueAdapter({
-      outbox: repositories.webhook.outboxRepository,
-    });
+  // Note: A queue adapter must be provided since we don't have a default outbox repository
+  const queueAdapter = options.queueAdapter;
+  if (!queueAdapter) {
+    throw new Error("queueAdapter is required. Provide a QueueAdapter implementation.");
+  }
 
   const pipeline = createPersistFirstWebhookPipeline({
     idempotencyRepository: repositories.webhook.idempotencyRepository,

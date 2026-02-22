@@ -2,30 +2,24 @@ import type { PaymentMethodRecord, PaymentMethodRepository } from "../../core/co
 import type { SolidusPaymentMethod } from "../models/SolidusPaymentMethod.ts";
 
 export class SolidusPaymentMethodRepository implements PaymentMethodRepository {
-  constructor(private model: typeof SolidusPaymentMethod) {}
+  constructor(private model: typeof SolidusPaymentMethod) { }
 
   async upsert(paymentMethod: PaymentMethodRecord): Promise<void> {
+    const idValue = paymentMethod.id ? Number(paymentMethod.id) : undefined;
     await this.model.upsert({
-      id: paymentMethod.id,
-      processor: paymentMethod.processor,
+      ...(idValue !== undefined && !Number.isNaN(idValue) ? { id: idValue } : {}),
       processorId: paymentMethod.processorId,
-      customerProcessorId: paymentMethod.customerProcessorId,
-      methodType: paymentMethod.methodType,
-      brand: paymentMethod.brand,
-      last4: paymentMethod.last4,
-      expMonth: paymentMethod.expMonth,
-      expYear: paymentMethod.expYear,
-      isDefault: paymentMethod.isDefault,
-      rawPayload: paymentMethod.rawPayload,
+      default: paymentMethod.default,
+      data: paymentMethod.data ?? {},
     });
   }
 
-  async clearDefaultForCustomer(customerProcessorId: string): Promise<void> {
+  async clearDefaultForCustomer(customerId: string): Promise<void> {
     await this.model.update(
-      { is_default: false },
+      { default: false },
       {
         where: {
-          customer_processor_id: customerProcessorId,
+          customer_id: Number(customerId),
         },
       }
     );
@@ -51,39 +45,25 @@ export class SolidusPaymentMethodRepository implements PaymentMethodRepository {
     }
 
     return {
-      id: row.id,
-      processor: row.processor,
+      id: String(row.id),
       processorId: row.processorId,
-      customerProcessorId: row.customerProcessorId,
-      methodType: row.methodType,
-      brand: row.brand ?? undefined,
-      last4: row.last4 ?? undefined,
-      expMonth: row.expMonth ?? undefined,
-      expYear: row.expYear ?? undefined,
-      isDefault: row.isDefault,
-      rawPayload: row.rawPayload,
+      default: row.default ?? undefined,
+      data: row.data ?? undefined,
     };
   }
 
-  async listByCustomer(customerProcessorId: string): Promise<readonly PaymentMethodRecord[]> {
+  async listByCustomer(customerId: string): Promise<readonly PaymentMethodRecord[]> {
     const rows = await this.model.findAll({
       where: {
-        customer_processor_id: customerProcessorId,
+        customer_id: Number(customerId),
       },
     });
 
     return rows.map((row) => ({
-      id: row.id,
-      processor: row.processor,
+      id: String(row.id),
       processorId: row.processorId,
-      customerProcessorId: row.customerProcessorId,
-      methodType: row.methodType,
-      brand: row.brand ?? undefined,
-      last4: row.last4 ?? undefined,
-      expMonth: row.expMonth ?? undefined,
-      expYear: row.expYear ?? undefined,
-      isDefault: row.isDefault,
-      rawPayload: row.rawPayload,
+      default: row.default ?? undefined,
+      data: row.data ?? undefined,
     }));
   }
 }

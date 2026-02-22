@@ -163,8 +163,6 @@ export function createSolidusFacade(options: SolidusFacadeOptions) {
             ownerId: owner.ownerId,
             processor: "stripe",
             processorId: customer.id,
-            email: customer.email ?? undefined,
-            metadata: customer.metadata,
           };
 
       const ownerCustomers = options.ownerCustomers;

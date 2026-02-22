@@ -4,8 +4,6 @@ export interface CustomerRecord {
   ownerId: string;
   processor: string;
   processorId: string;
-  email?: string;
-  metadata?: Record<string, string>;
 }
 
 export interface CustomerRepository {
@@ -50,40 +48,30 @@ export interface DomainEvent<TPayload = unknown> {
 
 export interface PaymentMethodRecord {
   id: string;
-  processor: string;
   processorId: string;
-  customerProcessorId: string;
-  methodType: string;
-  brand?: string;
-  last4?: string;
-  expMonth?: number;
-  expYear?: number;
-  isDefault: boolean;
-  rawPayload: unknown;
+  default?: boolean;
+  data?: Record<string, unknown>;
 }
 
 export interface PaymentMethodRepository {
   upsert(paymentMethod: PaymentMethodRecord): Promise<void>;
-  clearDefaultForCustomer(customerProcessorId: string): Promise<void>;
+  clearDefaultForCustomer(customerId: string): Promise<void>;
   deleteByProcessorId(processorId: string): Promise<void>;
   findByProcessorId(processorId: string): Promise<PaymentMethodRecord | null>;
-  listByCustomer(customerProcessorId: string): Promise<readonly PaymentMethodRecord[]>;
+  listByCustomer(customerId: string): Promise<readonly PaymentMethodRecord[]>;
 }
 
 export interface ChargeRecord {
   id: string;
-  processor: string;
   processorId: string;
-  customerProcessorId: string;
+  customerId: string;
+  subscriptionId?: string;
   amount: number;
-  currency: string;
-  status: string;
-  receiptUrl?: string;
-  taxAmount?: number;
-  totalTaxAmounts?: unknown;
-  refundTotal?: number;
-  paymentMethodSnapshot?: unknown;
-  rawPayload: unknown;
+  currency?: string;
+  applicationFeeAmount?: number;
+  amountRefunded?: number;
+  metadata?: Record<string, unknown>;
+  data?: Record<string, unknown>;
 }
 
 export interface ChargeRepository {
@@ -93,25 +81,30 @@ export interface ChargeRepository {
 
 export interface SubscriptionRecord {
   id: string;
-  processor: string;
+  customerId: string;
+  name: string;
   processorId: string;
-  customerProcessorId: string;
+  processorPlan: string;
+  quantity: number;
   status: string;
-  priceId?: string;
-  quantity?: number;
-  cancelAtPeriodEnd: boolean;
   currentPeriodStart?: Date;
   currentPeriodEnd?: Date;
   trialEndsAt?: Date;
-  pausedBehavior?: "void" | "keep_as_draft" | "mark_uncollectible";
-  pausedResumesAt?: Date;
-  rawPayload: unknown;
+  endsAt?: Date;
+  metered?: boolean;
+  pauseBehavior?: string;
+  pauseStartsAt?: Date;
+  pauseResumesAt?: Date;
+  applicationFeePercent?: number;
+  metadata?: Record<string, unknown>;
+  data?: Record<string, unknown>;
+  paymentMethodId?: string;
 }
 
 export interface SubscriptionRepository {
   upsert(subscription: SubscriptionRecord): Promise<void>;
   findByProcessorId(processorId: string): Promise<SubscriptionRecord | null>;
-  listByCustomer(customerProcessorId: string): Promise<readonly SubscriptionRecord[]>;
+  listByCustomer(customerId: string): Promise<readonly SubscriptionRecord[]>;
 }
 
 export interface EventBus {

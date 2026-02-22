@@ -2,24 +2,30 @@ import type { SubscriptionRecord, SubscriptionRepository } from "../../core/cont
 import type { SolidusSubscription } from "../models/SolidusSubscription.ts";
 
 export class SolidusSubscriptionRepository implements SubscriptionRepository {
-  constructor(private model: typeof SolidusSubscription) {}
+  constructor(private model: typeof SolidusSubscription) { }
 
   async upsert(subscription: SubscriptionRecord): Promise<void> {
+    const idValue = subscription.id ? Number(subscription.id) : undefined;
     await this.model.upsert({
-      id: subscription.id,
-      processor: subscription.processor,
+      ...(idValue !== undefined && !Number.isNaN(idValue) ? { id: idValue } : {}),
+      customerId: Number(subscription.customerId),
+      name: subscription.name,
       processorId: subscription.processorId,
-      customerProcessorId: subscription.customerProcessorId,
+      processorPlan: subscription.processorPlan,
+      quantity: subscription.quantity,
       status: subscription.status,
-      priceId: subscription.priceId,
-      quantity: subscription.quantity ?? 1,
-      cancelAtPeriodEnd: subscription.cancelAtPeriodEnd,
       currentPeriodStart: subscription.currentPeriodStart,
       currentPeriodEnd: subscription.currentPeriodEnd,
       trialEndsAt: subscription.trialEndsAt,
-      pausedBehavior: subscription.pausedBehavior,
-      pausedResumesAt: subscription.pausedResumesAt,
-      rawPayload: subscription.rawPayload,
+      endsAt: subscription.endsAt,
+      metered: subscription.metered,
+      pauseBehavior: subscription.pauseBehavior,
+      pauseStartsAt: subscription.pauseStartsAt,
+      pauseResumesAt: subscription.pauseResumesAt,
+      applicationFeePercent: subscription.applicationFeePercent,
+      metadata: subscription.metadata,
+      data: subscription.data ?? {},
+      paymentMethodId: subscription.paymentMethodId,
     });
   }
 
@@ -35,45 +41,55 @@ export class SolidusSubscriptionRepository implements SubscriptionRepository {
     }
 
     return {
-      id: row.id,
-      processor: row.processor,
+      id: String(row.id),
+      customerId: String(row.customerId),
+      name: row.name,
       processorId: row.processorId,
-      customerProcessorId: row.customerProcessorId,
-      status: row.status,
-      priceId: row.priceId ?? undefined,
+      processorPlan: row.processorPlan,
       quantity: row.quantity,
-      cancelAtPeriodEnd: row.cancelAtPeriodEnd,
+      status: row.status,
       currentPeriodStart: row.currentPeriodStart ?? undefined,
       currentPeriodEnd: row.currentPeriodEnd ?? undefined,
       trialEndsAt: row.trialEndsAt ?? undefined,
-      pausedBehavior: row.pausedBehavior ?? undefined,
-      pausedResumesAt: row.pausedResumesAt ?? undefined,
-      rawPayload: row.rawPayload,
+      endsAt: row.endsAt ?? undefined,
+      metered: row.metered ?? undefined,
+      pauseBehavior: row.pauseBehavior ?? undefined,
+      pauseStartsAt: row.pauseStartsAt ?? undefined,
+      pauseResumesAt: row.pauseResumesAt ?? undefined,
+      applicationFeePercent: row.applicationFeePercent ?? undefined,
+      metadata: row.metadata ?? undefined,
+      data: row.data ?? undefined,
+      paymentMethodId: row.paymentMethodId ?? undefined,
     };
   }
 
-  async listByCustomer(customerProcessorId: string): Promise<readonly SubscriptionRecord[]> {
+  async listByCustomer(customerId: string): Promise<readonly SubscriptionRecord[]> {
     const rows = await this.model.findAll({
       where: {
-        customer_processor_id: customerProcessorId,
+        customer_id: Number(customerId),
       },
     });
 
     return rows.map((row) => ({
-      id: row.id,
-      processor: row.processor,
+      id: String(row.id),
+      customerId: String(row.customerId),
+      name: row.name,
       processorId: row.processorId,
-      customerProcessorId: row.customerProcessorId,
-      status: row.status,
-      priceId: row.priceId ?? undefined,
+      processorPlan: row.processorPlan,
       quantity: row.quantity,
-      cancelAtPeriodEnd: row.cancelAtPeriodEnd,
+      status: row.status,
       currentPeriodStart: row.currentPeriodStart ?? undefined,
       currentPeriodEnd: row.currentPeriodEnd ?? undefined,
       trialEndsAt: row.trialEndsAt ?? undefined,
-      pausedBehavior: row.pausedBehavior ?? undefined,
-      pausedResumesAt: row.pausedResumesAt ?? undefined,
-      rawPayload: row.rawPayload,
+      endsAt: row.endsAt ?? undefined,
+      metered: row.metered ?? undefined,
+      pauseBehavior: row.pauseBehavior ?? undefined,
+      pauseStartsAt: row.pauseStartsAt ?? undefined,
+      pauseResumesAt: row.pauseResumesAt ?? undefined,
+      applicationFeePercent: row.applicationFeePercent ?? undefined,
+      metadata: row.metadata ?? undefined,
+      data: row.data ?? undefined,
+      paymentMethodId: row.paymentMethodId ?? undefined,
     }));
   }
 }

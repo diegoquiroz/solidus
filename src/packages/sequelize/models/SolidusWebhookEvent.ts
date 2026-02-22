@@ -1,19 +1,18 @@
 import { Model, DataTypes, Sequelize } from 'sequelize';
 
 export class SolidusWebhookEvent extends Model {
-  declare id: string;
-  declare merchantId?: string;
-  declare processor: string;
-  declare eventId: string;
-  declare eventType: string;
-  declare payload: Record<string, unknown>;
+  declare id: number;
+  declare processor?: string;
+  declare eventId?: string;
+  declare eventType?: string;
+  declare event: Record<string, unknown>;
+  declare type?: string;
+  declare attemptCount: number;
   declare receivedAt: Date;
   declare processedAt?: Date;
-  declare attemptCount: number;
   declare nextAttemptAt?: Date;
   declare lastError?: string;
   declare deadLetteredAt?: Date;
-  declare failureCount: number;
   declare createdAt: Date;
   declare updatedAt: Date;
 }
@@ -21,70 +20,63 @@ export class SolidusWebhookEvent extends Model {
 export function initSolidusWebhookEvent(sequelize: Sequelize, tablePrefix = 'solidus_', schema?: string) {
   SolidusWebhookEvent.init({
     id: { 
-      type: DataTypes.UUID, 
-      primaryKey: true, 
-      defaultValue: DataTypes.UUIDV4 
-    },
-    merchantId: { 
       type: DataTypes.BIGINT, 
-      allowNull: true, 
-      field: 'merchant_id' 
+      primaryKey: true, 
+      autoIncrement: true 
     },
     processor: { 
       type: DataTypes.STRING, 
-      allowNull: false 
+      allowNull: true 
     },
     eventId: { 
       type: DataTypes.STRING, 
-      allowNull: false, 
+      allowNull: true, 
       field: 'event_id' 
     },
     eventType: { 
       type: DataTypes.STRING, 
-      allowNull: false, 
+      allowNull: true, 
       field: 'event_type' 
     },
-    payload: { 
+    event: { 
       type: DataTypes.JSONB, 
-      allowNull: false 
-    },
-    receivedAt: { 
-      type: DataTypes.DATE, 
       allowNull: false, 
-      defaultValue: DataTypes.NOW, 
-      field: 'received_at' 
+      defaultValue: {} 
     },
-    processedAt: { 
-      type: DataTypes.DATE, 
-      allowNull: true, 
-      field: 'processed_at' 
+    type: { 
+      type: DataTypes.STRING, 
+      allowNull: true 
     },
     attemptCount: { 
       type: DataTypes.INTEGER, 
       allowNull: false, 
-      defaultValue: 0, 
-      field: 'attempt_count' 
+      defaultValue: 0,
+      field: 'attempt_count'
+    },
+    receivedAt: { 
+      type: DataTypes.DATE, 
+      allowNull: false,
+      field: 'received_at'
+    },
+    processedAt: { 
+      type: DataTypes.DATE, 
+      allowNull: true,
+      field: 'processed_at'
     },
     nextAttemptAt: { 
       type: DataTypes.DATE, 
-      allowNull: true, 
-      field: 'next_attempt_at' 
+      allowNull: true,
+      field: 'next_attempt_at'
     },
     lastError: { 
       type: DataTypes.TEXT, 
-      allowNull: true, 
-      field: 'last_error' 
+      allowNull: true,
+      field: 'last_error'
     },
     deadLetteredAt: { 
       type: DataTypes.DATE, 
-      allowNull: true, 
-      field: 'dead_lettered_at' 
-    },
-    failureCount: { 
-      type: DataTypes.INTEGER, 
-      allowNull: false, 
-      defaultValue: 0, 
-      field: 'failure_count' 
+      allowNull: true,
+      field: 'dead_lettered_at'
     },
   }, {
     sequelize,
