@@ -185,69 +185,63 @@ function toCustomerProjection(input: {
     processor: "stripe",
     processorId: input.customer.id,
     connectedAccountId: input.connectedAccountId,
-    email: input.customer.email ?? undefined,
-    metadata: input.customer.metadata,
-    rawPayload: input.customer,
+    data: {
+      email: input.customer.email,
+      metadata: input.customer.metadata,
+    },
   };
 }
 
 function toPaymentMethodRecord(input: {
   paymentMethod: Stripe.PaymentMethod;
   id: string;
-}): PaymentMethodRecord | null {
+  customerId: string;
+}): PaymentMethodRecord & { customerId: string } {
   const paymentMethod = input.paymentMethod;
-  const customerId = pickCustomerId(paymentMethod.customer);
-
-  if (customerId === undefined) {
-    return null;
-  }
 
   return {
     id: input.id,
-    processor: "stripe",
+    customerId: input.customerId,
     processorId: paymentMethod.id,
-    customerProcessorId: customerId,
-    methodType: paymentMethod.type ?? "unknown",
-    brand: paymentMethod.card?.brand,
-    last4: paymentMethod.card?.last4,
-    expMonth: paymentMethod.card?.exp_month,
-    expYear: paymentMethod.card?.exp_year,
-    isDefault: false,
-    rawPayload: paymentMethod,
+    default: false,
+    data: {
+      type: paymentMethod.type,
+      card: paymentMethod.card,
+    },
   };
 }
 
 function toSubscriptionRecord(input: {
   subscription: Stripe.Subscription;
   id: string;
-}): SubscriptionRecord | null {
+  customerId: string;
+}): SubscriptionRecord {
   const subscription = input.subscription;
   const firstItem = subscription.items.data[0];
   const rawSubscription = subscription as Stripe.Subscription & {
     current_period_start?: number;
     current_period_end?: number;
   };
-  const customerProcessorId = pickCustomerId(subscription.customer);
-
-  if (customerProcessorId === undefined) {
-    return null;
-  }
 
   return {
     id: input.id,
-    processor: "stripe",
+    customerId: input.customerId,
+    name: firstItem?.price.product?.toString() ?? 'default',
     processorId: subscription.id,
-    customerProcessorId,
+    processorPlan: firstItem?.price.id ?? '',
+    quantity: firstItem?.quantity ?? 1,
     status: subscription.status,
-    priceId: firstItem?.price.id,
-    quantity: firstItem?.quantity ?? undefined,
-    cancelAtPeriodEnd: subscription.cancel_at_period_end,
     currentPeriodStart: toDate(rawSubscription.current_period_start),
     currentPeriodEnd: toDate(rawSubscription.current_period_end),
     trialEndsAt: toDate(subscription.trial_end),
-    pausedBehavior: subscription.pause_collection?.behavior,
-    pausedResumesAt: toDate(subscription.pause_collection?.resumes_at),
-    rawPayload: subscription,
+    endsAt: toDate(subscription.ended_at),
+    metered: firstItem?.price.recurring?.usage_type === 'metered',
+    pauseBehavior: subscription.pause_collection?.behavior,
+    pauseStartsAt: undefined,
+    pauseResumesAt: toDate(subscription.pause_collection?.resumes_at),
+    data: {
+      cancelAtPeriodEnd: subscription.cancel_at_period_end,
+    },
   };
 }
 
@@ -305,36 +299,21 @@ function toChargeRecord(input: {
   charge: Stripe.Charge;
   paymentIntent: Stripe.PaymentIntent | null;
   id: string;
-}): ChargeRecord | null {
-  const customerProcessorId =
-    pickCustomerId(input.paymentIntent?.customer ?? null) ?? pickCustomerId(input.charge.customer);
-
-  if (customerProcessorId === undefined) {
-    return null;
-  }
-
-  const taxAmount = input.paymentIntent?.amount_details?.tax?.total_tax_amount ?? undefined;
-  const lineItems = input.paymentIntent?.amount_details?.line_items;
-  const lineItemTaxAmounts = (Array.isArray(lineItems) ? lineItems : lineItems?.data)
-    ?.map((lineItem) => lineItem.tax?.total_tax_amount)
-    .filter((value): value is number => typeof value === "number");
-
+  customerId: string;
+}): ChargeRecord {
   return {
     id: input.id,
-    processor: "stripe",
     processorId: input.charge.id,
-    customerProcessorId,
+    customerId: input.customerId,
     amount: input.charge.amount,
     currency: input.charge.currency,
-    status: input.paymentIntent?.status ?? input.charge.status ?? "unknown",
-    receiptUrl: input.charge.receipt_url ?? undefined,
-    taxAmount,
-    totalTaxAmounts: lineItemTaxAmounts && lineItemTaxAmounts.length > 0 ? lineItemTaxAmounts : undefined,
-    refundTotal: input.charge.amount_refunded,
-    paymentMethodSnapshot: input.charge.payment_method_details ?? undefined,
-    rawPayload: {
+    amountRefunded: input.charge.amount_refunded ?? undefined,
+    applicationFeeAmount: input.charge.application_fee_amount ?? undefined,
+    data: {
       charge: input.charge,
       paymentIntent: input.paymentIntent,
+      receiptUrl: input.charge.receipt_url,
+      paymentMethodSnapshot: input.charge.payment_method_details,
     },
   };
 }
@@ -376,7 +355,17 @@ export function createDefaultStripeWebhookEffects(
         connectedAccountId: getConnectedAccountId(requestOptions) ?? existingCustomer.connectedAccountId,
       }));
 
-      if (repositories.paymentMethods === undefined) {
+      if (repositories.paymentMethods === undefined || repositories.ownerCustomers === undefined) {
+        return;
+      }
+
+      // Look up internal customer ID from Stripe customer ID
+      const internalCustomer = await repositories.ownerCustomers.findByProcessor({
+        processor: "stripe",
+        processorId: customerId,
+      });
+
+      if (internalCustomer === null) {
         return;
       }
 
@@ -385,7 +374,7 @@ export function createDefaultStripeWebhookEffects(
           ? customer.invoice_settings.default_payment_method
           : customer.invoice_settings.default_payment_method?.id;
 
-      await repositories.paymentMethods.clearDefaultForCustomer(customerId);
+      await repositories.paymentMethods.clearDefaultForCustomer(internalCustomer.id);
 
       if (defaultPaymentMethodId === undefined) {
         return;
@@ -396,6 +385,7 @@ export function createDefaultStripeWebhookEffects(
       const record = toPaymentMethodRecord({
         paymentMethod,
         id: existing?.id ?? createOpaqueId(),
+        customerId: internalCustomer.id,
       });
 
       if (record === null) {
@@ -404,7 +394,7 @@ export function createDefaultStripeWebhookEffects(
 
       await repositories.paymentMethods.upsert({
         ...record,
-        isDefault: true,
+        default: true,
       });
     },
 
@@ -419,8 +409,16 @@ export function createDefaultStripeWebhookEffects(
         return;
       }
 
-      if (repositories.subscriptions !== undefined) {
-        const subscriptions = await repositories.subscriptions.listByCustomer(customerId);
+      // Look up internal customer record to get the internal ID
+      const internalCustomer = await repositories.ownerCustomers?.findByProcessor({
+        processor: "stripe",
+        processorId: customerId,
+      });
+
+      const internalCustomerId = internalCustomer?.id;
+
+      if (repositories.subscriptions !== undefined && internalCustomerId !== undefined) {
+        const subscriptions = await repositories.subscriptions.listByCustomer(internalCustomerId);
 
         for (const subscription of subscriptions) {
           if (!isActiveStripeSubscriptionStatus(subscription.status)) {
@@ -435,8 +433,8 @@ export function createDefaultStripeWebhookEffects(
         }
       }
 
-      if (repositories.paymentMethods !== undefined) {
-        const paymentMethods = await repositories.paymentMethods.listByCustomer(customerId);
+      if (repositories.paymentMethods !== undefined && internalCustomerId !== undefined) {
+        const paymentMethods = await repositories.paymentMethods.listByCustomer(internalCustomerId);
 
         for (const paymentMethod of paymentMethods) {
           await repositories.paymentMethods.deleteByProcessorId(paymentMethod.processorId);
@@ -447,9 +445,7 @@ export function createDefaultStripeWebhookEffects(
         processor: "stripe",
         processorId: customerId,
         connectedAccountId: existingCustomer?.connectedAccountId,
-        email: existingCustomer?.email,
-        metadata: existingCustomer?.metadata,
-        rawPayload: event.data.object as Stripe.Customer,
+        data: existingCustomer?.data,
       });
     },
 
@@ -474,25 +470,40 @@ export function createDefaultStripeWebhookEffects(
       });
       const paymentMethod = await options.stripe.paymentMethods.retrieve(paymentMethodId, requestOptions);
       const existing = await repositories.paymentMethods.findByProcessorId(paymentMethodId);
-      const record = toPaymentMethodRecord({
-        paymentMethod,
-        id: existing?.id ?? createOpaqueId(),
-      });
+      const stripeCustomerId = pickCustomerId(paymentMethod.customer);
 
-      if (record === null) {
+      if (stripeCustomerId === undefined) {
         return;
       }
 
-      const customer = await options.stripe.customers.retrieve(record.customerProcessorId, requestOptions) as Stripe.Customer;
+      // Look up internal customer ID from Stripe customer ID
+      const internalCustomer = await repositories.ownerCustomers?.findByProcessor({
+        processor: "stripe",
+        processorId: stripeCustomerId,
+      });
+
+      if (internalCustomer === undefined || internalCustomer === null) {
+        return;
+      }
+
+      const recordId = existing?.id ?? createOpaqueId();
+      const record = toPaymentMethodRecord({
+        paymentMethod,
+        id: recordId,
+        customerId: internalCustomer.id,
+      });
+
+      const customer = await options.stripe.customers.retrieve(stripeCustomerId, requestOptions) as Stripe.Customer;
       const defaultPaymentMethodId =
         typeof customer.invoice_settings.default_payment_method === "string"
           ? customer.invoice_settings.default_payment_method
           : customer.invoice_settings.default_payment_method?.id;
 
-      await repositories.paymentMethods.clearDefaultForCustomer(record.customerProcessorId);
+      await repositories.paymentMethods.clearDefaultForCustomer(internalCustomer.id);
       await repositories.paymentMethods.upsert({
         ...record,
-        isDefault: defaultPaymentMethodId === record.processorId,
+        id: recordId,
+        default: defaultPaymentMethodId === record.processorId,
       });
     },
 
@@ -511,6 +522,22 @@ export function createDefaultStripeWebhookEffects(
         resolveRequestOptions: options.resolveRequestOptions,
       });
       const charge = await options.stripe.charges.retrieve(chargeId, requestOptions);
+      const stripeCustomerId = pickCustomerId(charge.customer);
+
+      if (stripeCustomerId === undefined) {
+        return;
+      }
+
+      // Look up internal customer ID from Stripe customer ID
+      const internalCustomer = await repositories.ownerCustomers?.findByProcessor({
+        processor: "stripe",
+        processorId: stripeCustomerId,
+      });
+
+      if (internalCustomer === undefined || internalCustomer === null) {
+        return;
+      }
+
       const paymentIntentId = pickPaymentIntentId(charge.payment_intent);
       const paymentIntent =
         paymentIntentId === undefined
@@ -521,11 +548,8 @@ export function createDefaultStripeWebhookEffects(
         charge,
         paymentIntent,
         id: existing?.id ?? createOpaqueId(),
+        customerId: internalCustomer.id,
       });
-
-      if (record === null) {
-        return;
-      }
 
       await repositories.charges.upsert(record);
     },
@@ -551,16 +575,29 @@ export function createDefaultStripeWebhookEffects(
           ? paymentIntent.latest_charge
           : paymentIntent.latest_charge.id;
       const charge = await options.stripe.charges.retrieve(chargeId, requestOptions);
+      const stripeCustomerId = pickCustomerId(charge.customer);
+
+      if (stripeCustomerId === undefined) {
+        return;
+      }
+
+      // Look up internal customer ID from Stripe customer ID
+      const internalCustomer = await repositories.ownerCustomers?.findByProcessor({
+        processor: "stripe",
+        processorId: stripeCustomerId,
+      });
+
+      if (internalCustomer === undefined || internalCustomer === null) {
+        return;
+      }
+
       const existing = await repositories.charges.findByProcessorId(chargeId);
       const record = toChargeRecord({
         charge,
         paymentIntent,
         id: existing?.id ?? createOpaqueId(),
+        customerId: internalCustomer.id,
       });
-
-      if (record === null) {
-        return;
-      }
 
       await repositories.charges.upsert(record);
     },
@@ -576,15 +613,28 @@ export function createDefaultStripeWebhookEffects(
         resolveRequestOptions: options.resolveRequestOptions,
       });
       const subscription = await options.stripe.subscriptions.retrieve(subscriptionId, requestOptions);
+      const stripeCustomerId = pickCustomerId(subscription.customer);
+
+      if (stripeCustomerId === undefined) {
+        return;
+      }
+
+      // Look up internal customer ID from Stripe customer ID
+      const internalCustomer = await repositories.ownerCustomers?.findByProcessor({
+        processor: "stripe",
+        processorId: stripeCustomerId,
+      });
+
+      if (internalCustomer === undefined || internalCustomer === null) {
+        return;
+      }
+
       const existing = await repositories.subscriptions.findByProcessorId(subscriptionId);
       const record = toSubscriptionRecord({
         subscription,
         id: existing?.id ?? createOpaqueId(),
+        customerId: internalCustomer.id,
       });
-
-      if (record === null) {
-        return;
-      }
 
       await repositories.subscriptions.upsert(record);
     },

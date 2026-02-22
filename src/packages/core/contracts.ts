@@ -49,6 +49,7 @@ export interface DomainEvent<TPayload = unknown> {
 export interface PaymentMethodRecord {
   id: string;
   processorId: string;
+  customerId?: string;
   default?: boolean;
   data?: Record<string, unknown>;
 }

@@ -343,14 +343,14 @@ export function createSequelizeDelegatesFromModels(models: SequelizeReferenceMod
           "upsert",
         )(paymentMethod as unknown as Record<string, unknown>);
       },
-      async clearDefaultForCustomer(customerProcessorId) {
+      async clearDefaultForCustomer(customerId) {
         await requireModelMethod<
           (values: Record<string, unknown>, input: { where: Record<string, unknown> }) => Promise<unknown>
         >(models.paymentMethods, "update")({
-          isDefault: false,
+          default: false,
         }, {
           where: {
-            customerProcessorId,
+            customer_id: customerId,
           },
         });
       },
@@ -374,12 +374,12 @@ export function createSequelizeDelegatesFromModels(models: SequelizeReferenceMod
 
         return row === null ? null : asPlainRecord<PaymentMethodRecord>(row);
       },
-      async listByCustomer(customerProcessorId) {
+      async listByCustomer(customerId) {
         const rows = await requireModelMethod<
           (input: { where: Record<string, unknown> }) => Promise<readonly unknown[]>
         >(models.paymentMethods, "findAll")({
           where: {
-            customerProcessorId,
+            customer_id: customerId,
           },
         });
 
@@ -423,12 +423,12 @@ export function createSequelizeDelegatesFromModels(models: SequelizeReferenceMod
 
         return row === null ? null : asPlainRecord<SubscriptionRecord>(row);
       },
-      async listByCustomer(customerProcessorId) {
+      async listByCustomer(customerId) {
         const rows = await requireModelMethod<
           (input: { where: Record<string, unknown> }) => Promise<readonly unknown[]>
         >(models.subscriptions, "findAll")({
           where: {
-            customerProcessorId,
+            customer_id: customerId,
           },
         });
 

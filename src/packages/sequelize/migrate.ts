@@ -8,7 +8,6 @@ import {
   initSolidusMerchant,
   initSolidusWebhookEvent,
   initSolidusIdempotencyKey,
-  initSolidusStripeCustomer,
 } from "./models/index.ts";
 
 export interface MigrateToZeroConfigOptions {
@@ -32,7 +31,6 @@ const TABLE_MAPPINGS = {
   merchants: "merchants",
   webhookEvents: "webhooks",
   idempotencyKeys: "idempotency_keys",
-  stripeCustomers: "stripe_customers",
 } as const;
 
 export async function migrateToZeroConfig(
@@ -73,7 +71,6 @@ export async function migrateToZeroConfig(
     merchants: initSolidusMerchant(sequelize, newPrefix),
     webhookEvents: initSolidusWebhookEvent(sequelize, newPrefix),
     idempotencyKeys: initSolidusIdempotencyKey(sequelize, newPrefix),
-    stripeCustomers: initSolidusStripeCustomer(sequelize, newPrefix),
   };
 
   // 3. Migrate each table type
@@ -116,7 +113,6 @@ export async function migrateToZeroConfig(
         case "merchants": model = NewModels.merchants; break;
         case "webhookEvents": model = NewModels.webhookEvents; break;
         case "idempotencyKeys": model = NewModels.idempotencyKeys; break;
-        case "stripeCustomers": model = NewModels.stripeCustomers; break;
     }
 
     if (!model) continue;

@@ -8,8 +8,8 @@ export class SolidusChargeRepository implements ChargeRepository {
     const idValue = charge.id ? Number(charge.id) : undefined;
     await this.model.upsert({
       ...(idValue !== undefined && !Number.isNaN(idValue) ? { id: idValue } : {}),
-      processorId: charge.processorId,
       customerId: Number(charge.customerId),
+      processorId: charge.processorId,
       subscriptionId: charge.subscriptionId ? Number(charge.subscriptionId) : null,
       amount: charge.amount,
       currency: charge.currency,

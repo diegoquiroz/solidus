@@ -9,7 +9,6 @@ import {
   SolidusSubscriptionRepository,
   SolidusWebhookEventRepository,
   SolidusIdempotencyRepository,
-  SolidusStripeCustomerRepository,
 } from "./repositories/index.ts";
 
 export interface WebhookRepositories {
@@ -28,7 +27,6 @@ export function createRepositoryBundleFromSolidusModels(
 ): RepositoryBundle {
   const customers = new SolidusCustomerRepository(models.Customer);
   const idempotency = new SolidusIdempotencyRepository(models.IdempotencyKey);
-  const stripeCustomers = new SolidusStripeCustomerRepository(models.StripeCustomer);
   const paymentMethods = new SolidusPaymentMethodRepository(models.PaymentMethod);
   const charges = new SolidusChargeRepository(models.Charge);
   const subscriptions = new SolidusSubscriptionRepository(models.Subscription);
@@ -40,7 +38,6 @@ export function createRepositoryBundleFromSolidusModels(
       idempotency,
     },
     facade: {
-      customers: stripeCustomers,
       accounts: undefined,
       paymentMethods,
       charges,

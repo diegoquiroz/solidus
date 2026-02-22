@@ -6,8 +6,10 @@ export class SolidusPaymentMethodRepository implements PaymentMethodRepository {
 
   async upsert(paymentMethod: PaymentMethodRecord): Promise<void> {
     const idValue = paymentMethod.id ? Number(paymentMethod.id) : undefined;
+    const customerIdValue = paymentMethod.customerId ? Number(paymentMethod.customerId) : undefined;
     await this.model.upsert({
       ...(idValue !== undefined && !Number.isNaN(idValue) ? { id: idValue } : {}),
+      ...(customerIdValue !== undefined && !Number.isNaN(customerIdValue) ? { customerId: customerIdValue } : {}),
       processorId: paymentMethod.processorId,
       default: paymentMethod.default,
       data: paymentMethod.data ?? {},

@@ -15,9 +15,7 @@ export interface StripeCustomerProjection {
   processor: "stripe";
   processorId: string;
   connectedAccountId?: string;
-  email?: string;
-  metadata?: Record<string, string>;
-  rawPayload: Stripe.Customer;
+  data?: Record<string, unknown>;
 }
 
 export interface StripeCustomerProjectionRepository {
@@ -460,9 +458,11 @@ async function updateSubscriptionAndPersist(
 ): Promise<Stripe.Subscription> {
   const subscription = await stripe.subscriptions.update(subscriptionId, update);
   const recordId = await resolveSubscriptionRecordId(repositories, subscription.id);
+  const customerId = typeof subscription.customer === "string" ? subscription.customer : subscription.customer.id;
   await repositories.subscriptions?.upsert(toSubscriptionRecord({
     subscription,
     id: recordId,
+    customerId,
   }));
   return subscription;
 }
@@ -488,9 +488,10 @@ export function createStripeCoreApi(options: StripeCoreApiOptions) {
         await repositories.customers?.upsert({
           processor: "stripe",
           processorId: customer.id,
-          email: customer.email ?? undefined,
-          metadata: customer.metadata,
-          rawPayload: customer,
+          data: {
+            email: customer.email,
+            metadata: customer.metadata,
+          },
         });
 
         return customer;
@@ -527,9 +528,10 @@ export function createStripeCoreApi(options: StripeCoreApiOptions) {
         await repositories.customers?.upsert({
           processor: "stripe",
           processorId: customer.id,
-          email: customer.email ?? undefined,
-          metadata: customer.metadata,
-          rawPayload: customer,
+          data: {
+            email: customer.email,
+            metadata: customer.metadata,
+          },
         });
 
         return customer;
@@ -792,9 +794,11 @@ export function createStripeCoreApi(options: StripeCoreApiOptions) {
           ...input.stripeOptions,
         });
 
+        const customerId = typeof subscription.customer === "string" ? subscription.customer : subscription.customer.id;
         const record = toSubscriptionRecord({
           subscription,
           id: await resolveSubscriptionRecordId(repositories, subscription.id),
+          customerId,
         });
         await repositories.subscriptions?.upsert(record);
         return record;

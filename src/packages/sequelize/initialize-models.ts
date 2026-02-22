@@ -14,8 +14,6 @@ import {
   initSolidusWebhookEvent,
   SolidusIdempotencyKey,
   initSolidusIdempotencyKey,
-  SolidusStripeCustomer,
-  initSolidusStripeCustomer,
 } from "./models/index.ts";
 
 export interface InitializeSolidusModelsOptions {
@@ -31,7 +29,6 @@ export interface SolidusModels {
   Merchant: typeof SolidusMerchant;
   WebhookEvent: typeof SolidusWebhookEvent;
   IdempotencyKey: typeof SolidusIdempotencyKey;
-  StripeCustomer: typeof SolidusStripeCustomer;
 }
 
 export function initializeSolidusModels(
@@ -48,7 +45,6 @@ export function initializeSolidusModels(
   initSolidusMerchant(sequelize, tablePrefix, schema);
   initSolidusWebhookEvent(sequelize, tablePrefix, schema);
   initSolidusIdempotencyKey(sequelize, tablePrefix, schema);
-  initSolidusStripeCustomer(sequelize, tablePrefix, schema);
 
   // NOTE: Associations are disabled in Zero-Config mode to avoid Sequelize
   // version conflicts when using file-based local dependencies.
@@ -60,8 +56,6 @@ export function initializeSolidusModels(
   // SolidusSubscription.belongsTo(SolidusCustomer, { foreignKey: 'customer_id' });
   // SolidusCustomer.hasMany(SolidusPaymentMethod, { foreignKey: 'customer_id' });
   // SolidusPaymentMethod.belongsTo(SolidusCustomer, { foreignKey: 'customer_id' });
-  // SolidusCustomer.hasOne(SolidusStripeCustomer, { foreignKey: 'customer_id' });
-  // SolidusStripeCustomer.belongsTo(SolidusCustomer, { foreignKey: 'customer_id' });
 
   return {
     Customer: SolidusCustomer,
@@ -71,6 +65,5 @@ export function initializeSolidusModels(
     Merchant: SolidusMerchant,
     WebhookEvent: SolidusWebhookEvent,
     IdempotencyKey: SolidusIdempotencyKey,
-    StripeCustomer: SolidusStripeCustomer,
   };
 }

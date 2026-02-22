@@ -5,4 +5,3 @@ export { SolidusPaymentMethod, initSolidusPaymentMethod } from './SolidusPayment
 export { SolidusMerchant, initSolidusMerchant } from './SolidusMerchant.ts';
 export { SolidusWebhookEvent, initSolidusWebhookEvent } from './SolidusWebhookEvent.ts';
 export { SolidusIdempotencyKey, initSolidusIdempotencyKey } from './SolidusIdempotencyKey.ts';
-export { SolidusStripeCustomer, initSolidusStripeCustomer } from './SolidusStripeCustomer.ts';
